@@ -1,0 +1,17 @@
+Debug/
+Debug.NET/
+Debug.clr/
+Release/
+Release.NET/
+Release.clr/
+Doc/
+ipch/
+
+token.txt
+*.bmp
+*.sdf
+*.opensdf
+*.ipch
+*.aps
+*.suo
+*.user

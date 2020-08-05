@@ -6,15 +6,18 @@
 #include "Demo_Basic.h"
 #include "Demo_BasicDlg.h"
 #include "afxdialogex.h"
-#include "MvDeviceManager.h"
 #include "resource.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-#define TIMERID_GET_FPS   1
 
+
+TCHAR     g_szTraceInfo[128] = { 0 };
+
+
+//using namespace MVDSDK;
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -50,20 +53,27 @@ END_MESSAGE_MAP()
 // CDemo_BasicDlg 对话框
 
 
-
 CDemo_BasicDlg::CDemo_BasicDlg(CWnd* pParent /*=NULL*/)
-: CDialogEx(CDemo_BasicDlg::IDD, pParent), m_pMvDeviceManager(NULL)
+: CDialogEx(CDemo_BasicDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
-	m_pMvDeviceManager = new CMvDeviceManager();
 
 	m_nDeviceCurSel = -1;    // 当前操作设备的索引号
+
+	memset(m_hGrabImageExitEvent, NULL, MVD_MAX_DEVICE_NUM * sizeof(HANDLE));
+	memset(m_hGrabImageThread, NULL, MVD_MAX_DEVICE_NUM * sizeof(HANDLE));
+	memset(&m_GrabImageThread, NULL, MVD_MAX_DEVICE_NUM * sizeof(GRAB_THREAD_CONTEXT));
+
+	m_pBitmapInfo = NULL;
+
+	InitialBmpInfo();        /// 初始化图像信息，用于显示
 }
 
 void CDemo_BasicDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_LIST_TRACE, m_ListTrace);
 }
 
 BEGIN_MESSAGE_MAP(CDemo_BasicDlg, CDialogEx)
@@ -80,8 +90,16 @@ BEGIN_MESSAGE_MAP(CDemo_BasicDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_CHECK_START_GRAB, &CDemo_BasicDlg::OnBnClickedCheckStartGrab)
 	ON_WM_HSCROLL()
 	ON_WM_TIMER()
-	ON_BN_CLICKED(IDC_CHECK_SETTINGS, &CDemo_BasicDlg::OnBnClickedCheckSettings)
+	ON_BN_CLICKED(IDC_BUTTON_SETTING, &CDemo_BasicDlg::OnBnClickedButtonSetting)
+	ON_MESSAGE(MSG_TRACE, &CDemo_BasicDlg::OnTraceMsg)
 END_MESSAGE_MAP()
+
+LRESULT CDemo_BasicDlg::OnTraceMsg(WPARAM wParam, LPARAM lParam)
+{
+	m_ListTrace.AddString((LPCTSTR)lParam);
+	return 0;
+}
+
 
 void CDemo_BasicDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
@@ -135,15 +153,18 @@ HCURSOR CDemo_BasicDlg::OnQueryDragIcon()
 void CDemo_BasicDlg::OnClose()
 {
 	// TODO:  在此添加消息处理程序代码和/或调用默认值
-	MVD_Uninitial();
-
-	if (m_pMvDeviceManager != NULL)
+	if (m_pBitmapInfo)
 	{
-		delete m_pMvDeviceManager;
-		m_pMvDeviceManager = NULL;
+		delete [] m_pBitmapInfo;
+		m_pBitmapInfo = NULL;
 	}
+
+	Uninitial();
+
 	CDialogEx::OnClose();
 }
+
+
 
 // CDemo_BasicDlg 消息处理程序
 BOOL CDemo_BasicDlg::OnInitDialog()
@@ -179,43 +200,20 @@ BOOL CDemo_BasicDlg::OnInitDialog()
 	CComboBox    *pComboBox = (CComboBox*)GetDlgItem(IDC_COMBO_DEVICES_LIST);
 	pComboBox->ResetContent();
 
-	// 获取SDK版本号
-	int nSdkVersion = m_pMvDeviceManager->QuerySdkVersion();
-	TCHAR szSdkVersion[128] = { 0 };
-	_stprintf(szSdkVersion, _T("%d-%d-%d-%d"), (nSdkVersion & 0xff000000) >> 24, (nSdkVersion & 0x00ff0000) >> 16, (nSdkVersion & 0x0000ff00) >> 8, (nSdkVersion & 0x000000ff));
-	SetWindowText(szSdkVersion);
+	TRACE_API( Initial(DIT_ALL, &m_DeviceInformationList) );
 
-	// 获取设备数目
-	int nDeviceNum = m_pMvDeviceManager->GetDeviceNum();
-
-	// 获取设备信息列表，并显示简单的设备信息在“设备列表下拉框”里
-	MVD_DEVICE_INFO    stDeviceInfo;
-	unsigned char ucIp1, ucIp2, ucIp3, ucIp4;
-	for (int i = 0; i < nDeviceNum; i++)
+	for (unsigned int i = 0; i < m_DeviceInformationList.uiDeviceNum; i++)
 	{
-		memset(&stDeviceInfo, 0, sizeof(MVD_DEVICE_INFO));
-
-		// 获取设备的信息
-		m_pMvDeviceManager->GetDeviceInfo(i, &stDeviceInfo);
-
-		if (stDeviceInfo.DeviceInterfaceType == MVD_DEVICE_INTERFACE_TYPE_GIGE)
-		{
-			ucIp1 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0xff000000) >> 24);
-			ucIp2 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x00ff0000) >> 16);
-			ucIp3 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x0000ff00) >> 8);
-			ucIp4 = (stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x000000ff);
-
-     		// 千兆网接口设备信息
-			TCHAR szDeviceInfo[128] = { 0 };
-			_stprintf(szDeviceInfo, _T("%d-%s-%s-IP:%d.%d.%d.%d"), i, stDeviceInfo.Info.stDeviceInfoGige.szDeviceModelName, \
-				stDeviceInfo.Info.stDeviceInfoGige.szDeviceSerialNumber, \
-				ucIp4, ucIp3, ucIp2, ucIp1);
-			pComboBox->AddString(szDeviceInfo);
-		}
+		TCHAR szString[256] = { 0 };
+		_stprintf_s(szString, 256, _T("Model: %s, Serial Number: %d"),
+			m_DeviceInformationList.pDeviceInformation[i]->szModelName,
+			m_DeviceInformationList.pDeviceInformation[i]->uiSerialNumber
+			);
+		pComboBox->AddString(szString);
 	}
 
 	// 默认选择的设备索引，如果没有设备，将索引设为-1
-	m_nDeviceCurSel = nDeviceNum == 0 ? -1 : 0;     
+	m_nDeviceCurSel = m_DeviceInformationList.uiDeviceNum == 0 ? -1 : 0;
 	pComboBox->SetCurSel(m_nDeviceCurSel);
 
 	// 更加选择的设备，更新界面
@@ -224,132 +222,275 @@ BOOL CDemo_BasicDlg::OnInitDialog()
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
-// 因为只有一个窗口，同一时刻只让被选择的设备显示
-int CDemo_BasicDlg::SetOnlySelectedDeviceDisplay()
+/// 初始化图像信息头，用于显示函数
+void CDemo_BasicDlg::InitialBmpInfo()
 {
-	CStatic *pStaticDisplay = ((CStatic*)GetDlgItem(IDC_STATIC_DISPLAY));
+	if (m_pBitmapInfo != NULL)    return;
 
-	RECT    rtDisplay = { 0 };
-	pStaticDisplay->GetClientRect(&rtDisplay);
+	m_pBitmapInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFOHEADER)+256 * sizeof(RGBQUAD)];
+	memset((VOID*)m_pBitmapInfo, 0, sizeof(BITMAPINFOHEADER)+256 * sizeof(RGBQUAD));
 
-	MVD_DISPLAY_POSITION_INFO    stDisplayPositionInfo = { 0 };
-
-	int nDeviceNum = m_pMvDeviceManager->GetDeviceNum();
-	for (int i = 0; i < nDeviceNum; i++)
+	if (m_pBitmapInfo == NULL)
 	{
-		if (i == m_nDeviceCurSel)
-		{
-			stDisplayPositionInfo.hDisplayWnd = pStaticDisplay->GetSafeHwnd();
-			stDisplayPositionInfo.nX          = rtDisplay.left;
-			stDisplayPositionInfo.nY          = rtDisplay.top;
-			stDisplayPositionInfo.nWidth      = rtDisplay.right - rtDisplay.left;
-			stDisplayPositionInfo.nHeight     = rtDisplay.bottom - rtDisplay.top;
-		}
-		else
-		{
-			memset(&stDisplayPositionInfo, 0, sizeof(MVD_DISPLAY_POSITION_INFO));
-		}
-
-	    m_pMvDeviceManager->SetDisplayInfo(i, &stDisplayPositionInfo);
-
+		return;
 	}
 
-	return 0;
+	m_pBitmapInfo->bmiHeader.biSize = sizeof(tagBITMAPINFOHEADER);
+	m_pBitmapInfo->bmiHeader.biPlanes = 1;
+	m_pBitmapInfo->bmiHeader.biCompression = BI_RGB;
+	m_pBitmapInfo->bmiHeader.biSizeImage = 0;
+	m_pBitmapInfo->bmiHeader.biXPelsPerMeter = 0;
+	m_pBitmapInfo->bmiHeader.biYPelsPerMeter = 0;
+	m_pBitmapInfo->bmiHeader.biClrUsed = 0;
+	m_pBitmapInfo->bmiHeader.biClrImportant = 0;
+
+	m_pBitmapInfo->bmiHeader.biWidth = 0;
+	m_pBitmapInfo->bmiHeader.biHeight = 0;
+	m_pBitmapInfo->bmiHeader.biBitCount = 0;
+	m_pBitmapInfo->bmiHeader.biSizeImage = 0;  //m_nWidth * m_nHeight * ( m_nBitCount >> 3 );
+	for (int i = 0; i<256; i++)
+	{
+		m_pBitmapInfo->bmiColors[i].rgbBlue = (BYTE)i;
+		m_pBitmapInfo->bmiColors[i].rgbGreen = (BYTE)i;
+		m_pBitmapInfo->bmiColors[i].rgbRed = (BYTE)i;
+		m_pBitmapInfo->bmiColors[i].rgbReserved = (BYTE)i;
+	}
 }
 
-// 当用户改变当前选择设备
+/// 显示采集的图像
+void CDemo_BasicDlg::DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE *pGrabImage)
+{
+	if (pGrabImage == NULL)    return;
+	if (nDeviceIndex != m_nDeviceCurSel)    return;
+
+	HWND   hStaticDisplay = (HWND)::GetDlgItem(m_hWnd, IDC_STATIC_DISPLAY);
+	HDC    hDC = ::GetDC(hStaticDisplay);
+	int    nOldMode = -1;
+
+	/// 根据采集图像基本信息修改图像信息头
+	m_pBitmapInfo->bmiHeader.biWidth = pGrabImage->ImageBaseInfo.nImageWidth;
+	m_pBitmapInfo->bmiHeader.biHeight = pGrabImage->ImageBaseInfo.nImageHeight;
+	m_pBitmapInfo->bmiHeader.biBitCount = pGrabImage->ImageBaseInfo.nImageBitCount;
+	m_pBitmapInfo->bmiHeader.biSizeImage = pGrabImage->ImageBaseInfo.nTotalBytes;
+
+
+	RECT   rt;
+	::GetClientRect(hStaticDisplay, &rt);
+	nOldMode = ::SetStretchBltMode(hDC, COLORONCOLOR);
+
+	/// 显示图像在Static控件上
+	::StretchDIBits(hDC,
+		rt.left, rt.top, rt.right - rt.left, rt.bottom - rt.top,
+		0, 0, pGrabImage->ImageBaseInfo.nImageWidth, pGrabImage->ImageBaseInfo.nImageHeight,
+		pGrabImage->ucImageData,
+		(BITMAPINFO *)m_pBitmapInfo,
+		DIB_RGB_COLORS,
+		SRCCOPY);
+
+	::SetStretchBltMode(hDC, nOldMode);
+
+	::ReleaseDC(hStaticDisplay, hDC);
+
+	return;
+}
+
+/// 主要用于显示帧率
+void CDemo_BasicDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	if (m_nDeviceCurSel == -1)    return;
+
+	/// 显示帧率计时器
+	if (nIDEvent == TIMERID_GET_FPS)
+	{
+		float fFps;
+
+		TRACE_API(GetGrabbingFps(m_nDeviceCurSel, &fFps));
+		TCHAR   szFps[32] = { '\0' };
+		_stprintf_s(szFps, 32, _T("Grab Fps = %0.2f"), fFps);
+		SetWindowText(szFps);
+	}
+
+	CDialogEx::OnTimer(nIDEvent);
+}
+
+
+/// 当用户改变当前选择设备
 void CDemo_BasicDlg::OnCbnSelchangeComboDevicesList()
 {
-	// 先获取当前被选择的设备索引
+	/// 先获取当前被选择的设备索引
 	CComboBox    *pComboBox = (CComboBox*)GetDlgItem(IDC_COMBO_DEVICES_LIST);
 	m_nDeviceCurSel = pComboBox->GetCurSel();
 
 	Update_Interface_When_Device_Selected();
 }
 
-// 打开、关闭设备
+/// 打开、关闭设备
 void CDemo_BasicDlg::OnBnClickedCheckOpenCloseDevice()
 {
 	if (m_nDeviceCurSel == -1)    return;
 
 	BOOL bCheck = ((CButton*)GetDlgItem(IDC_CHECK_OPEN_CLOSE_DEVICE))->GetCheck();
 
-	if (bCheck)
-	{
-		m_pMvDeviceManager->OpenDevice(m_nDeviceCurSel, true);
-	}
-	else
-	{
-		m_pMvDeviceManager->OpenDevice(m_nDeviceCurSel, false);
-	}
+	TRACE_API(SetDeviceOpen(m_nDeviceCurSel, bCheck ? true : false));
 
 	Update_Interface_When_Device_Selected();
 }
 
-void __stdcall ImageCallback(MVD_FRAME_OUT* pFrameOut, void* pUser)
+
+/// 采集回调
+void __stdcall GrabbingCallback(int nDeviceIndex, MVD_GRAB_IMAGE* pGrabImage, void* pUser)
 {
 	CDemo_BasicDlg *pDlg = (CDemo_BasicDlg*)pUser;
 
 	TCHAR szBuf[128] = { 0 };
-	_stprintf(szBuf, _T("FrameId    = %d\n"), pFrameOut->stFrameOutInfo.uiFrameId);
-	OutputDebugString(szBuf);
-	_stprintf(szBuf, _T("FrameData  = %d\n"), pFrameOut->ucFrameData);
-	OutputDebugString(szBuf);
+	_stprintf_s(szBuf, 128, _T("GrabbingCallback( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"), pGrabImage->ImageExtendInfo.uiFrameCounter, pGrabImage->ImageExtendInfo.ui64ElapseTimeMicrosecond, pGrabImage->ucImageData);
+	// m_ListTrace.AddString(szBuf);
 
+	/// 显示图像
+	pDlg->DisplayImage(nDeviceIndex, pGrabImage);
 }
 
-// 启动、停止回调采集
+/// 启动、停止回调采集
 void CDemo_BasicDlg::OnBnClickedCheckStartCallbackGrab()
 {
 	if (m_nDeviceCurSel == -1)    return;
 
 	BOOL bCheck = ((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB))->GetCheck();
 
-
 	if (bCheck)
 	{
-		MVD_StartGrabbing(m_nDeviceCurSel);
-		MVD_SetCallBack(m_nDeviceCurSel, &ImageCallback, this);
-		MVD_StartCallback(m_nDeviceCurSel);     // 在回调里获取图像
+		m_ListTrace.ResetContent();
 
-		((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB))->SetWindowText(_T("停止回调采集"));
-
-		SetTimer(TIMERID_GET_FPS, 2000, NULL);//启动计时器显示帧率
+		/// 需先启动采集
+		TRACE_API(SetGrabbingStart(m_nDeviceCurSel, true));
+		/// 再开启回调
+		TRACE_API(SetGrabbingCallback(m_nDeviceCurSel, &GrabbingCallback, this));
+		/// 启动计时器显示帧率
+		SetTimer(TIMERID_GET_FPS, 2000, NULL);    
 	}
 	else
 	{
-		MVD_StopCallback(m_nDeviceCurSel);      // 停止在回调里获取图像
-		MVD_StopGrabbing(m_nDeviceCurSel);
-
-		((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB))->SetWindowText(_T("启动回调采集"));
-
-		KillTimer(TIMERID_GET_FPS);          //关闭计时器
+		/// 需先停止回调
+		TRACE_API(SetGrabbingCallback(m_nDeviceCurSel, NULL, NULL));
+		/// 再停止采集
+		TRACE_API(SetGrabbingStart(m_nDeviceCurSel, false));
+		KillTimer(TIMERID_GET_FPS);
 	}
+
+	((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB))->SetWindowText( bCheck ? _T("停止回调采集") : _T("启动回调采集"));
 
 	CButton            *pBtnStartCallbackGrab = ((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB));
 	CButton            *pBtnStartGrab = ((CButton*)GetDlgItem(IDC_CHECK_START_GRAB));
-	if (m_pMvDeviceManager->QueryIsCallbackGrab(m_nDeviceCurSel))
-	{
-		// 启动回调采集，就不能进行主动采集
-		pBtnStartGrab->EnableWindow(false);
-	}
-	else
-	{
-		pBtnStartGrab->EnableWindow(true);
-	}
 
-	if (m_pMvDeviceManager->IsGrabImageThreadRunning(m_nDeviceCurSel))
-	{
-		// 启动主动采集，就不能进行回调采集
-		pBtnStartCallbackGrab->EnableWindow(false);
-	}
-	else
-	{
-		pBtnStartCallbackGrab->EnableWindow(true);
-	}
+	pBtnStartGrab->EnableWindow(bCheck ? false : true);
 }
 
-// 启动、停止主动采集
+/// 主动采集线程
+UINT WINAPI GrabImageThread(LPVOID pParam)
+{
+	GRAB_THREAD_CONTEXT    *pGrabThreadContext = (GRAB_THREAD_CONTEXT*)pParam;
+	CDemo_BasicDlg *pDlg = (CDemo_BasicDlg*)pGrabThreadContext->pDlg;
+
+	pDlg->GrabImageThreadX(pGrabThreadContext->nDeviceIndex);
+	return 0;
+}
+
+void CDemo_BasicDlg::GrabImageThreadX(int nDeviceIndex)
+{
+	if (nDeviceIndex == -1)    return;
+
+	int nRet = MVD_SUCCESS;
+
+	while (TRUE)
+	{
+		if (WAIT_OBJECT_0 == WaitForSingleObject(m_hGrabImageExitEvent[nDeviceIndex], 0))
+		{ /// 退出线程事件通知
+			break;
+		}
+
+		/// 采集一帧图像，这时的图像信息及数据都在pImageOut结构中，这个是SDK分配的，要尽快调用GrabImageRelease释放。
+		MVD_GRAB_IMAGE *pGrabImage = NULL;
+		TRACE_API(GrabImage(nDeviceIndex, &pGrabImage));
+
+		TCHAR szBuf[128] = { 0 };
+		_stprintf_s(szBuf, 128, _T("GrabImageThreadX( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"), pGrabImage->ImageExtendInfo.uiFrameCounter, pGrabImage->ImageExtendInfo.ui64ElapseTimeMicrosecond, pGrabImage->ucImageData);
+		// m_ListTrace.AddString(szBuf);
+
+		/// 显示图像到Static窗口
+		DisplayImage(nDeviceIndex, pGrabImage);
+
+#if 0
+		/// 保存图像
+		TCHAR chImageName[256] = { 0 };
+		_stprintf_s(chImageName, 256, _T("Image_w%d_h%d_fn%08d.bmp"), pImageOut->ImageBaseInfo.nImageWidth, pImageOut->ImageBaseInfo.nImageHeight, pImageOut->ImageExtendInfo.ui64DeviceTimeStamp);
+
+		MVD_SAVE_IMAGE_INFORMATION SaveImageParam = { 0 };
+		SaveImageParam.pszImageName = chImageName;
+		SaveImageParam.SaveImageFormat = SIF_JPG;
+		SaveImageParam.nJpgQuality = 0;
+		nRet = SaveImage(pImageOut, SaveImageParam);
+#endif
+		// 当MVD_GrabImage返回的内存使用完之后，必须要调用GrabImageRelease进行释放。
+		TRACE_API(GrabImageRelease(m_nDeviceCurSel));
+	}
+
+}
+
+
+/// 启动、停止主动采集线程
+bool CDemo_BasicDlg::StartGrabImageThread(bool bStart)
+{
+	if (m_nDeviceCurSel == -1)    return false;
+
+	if (bStart)
+	{
+		if (m_hGrabImageThread[m_nDeviceCurSel] != NULL)   return true;
+
+		TRACE_API(SetGrabbingStart(m_nDeviceCurSel, true));
+
+		m_hGrabImageExitEvent[m_nDeviceCurSel] = CreateEvent(NULL, TRUE, FALSE, NULL);		// Manual Reset, No signal
+
+		DWORD    dwThreadID;
+
+		/// 为了区分多台相机，将相机的索引传递给线程作为线程的上下文
+		m_GrabImageThread[m_nDeviceCurSel].pDlg = this;
+		m_GrabImageThread[m_nDeviceCurSel].nDeviceIndex = m_nDeviceCurSel;
+
+		m_hGrabImageThread[m_nDeviceCurSel] = (HANDLE)_beginthreadex(NULL, 0, (PBEGINTHREADEX_FUNC)GrabImageThread, &m_GrabImageThread[m_nDeviceCurSel], 0, (PBEGINTHREADEX_ID)&dwThreadID);
+
+		if (m_hGrabImageThread[m_nDeviceCurSel] != NULL)
+		{
+			return true;
+		}
+
+	}
+	else
+	{
+		if (m_hGrabImageExitEvent[m_nDeviceCurSel] != NULL)
+		{
+			SetEvent(m_hGrabImageExitEvent[m_nDeviceCurSel]);
+		}
+
+		if (WAIT_OBJECT_0 != WaitForSingleObject(m_hGrabImageThread[m_nDeviceCurSel], 5000))
+		{
+			TerminateThread(m_hGrabImageThread[m_nDeviceCurSel], 0);
+		}
+
+		CloseHandle(m_hGrabImageThread[m_nDeviceCurSel]);
+		m_hGrabImageThread[m_nDeviceCurSel] = NULL;
+
+		CloseHandle(m_hGrabImageExitEvent[m_nDeviceCurSel]);
+		m_hGrabImageExitEvent[m_nDeviceCurSel] = NULL;
+
+		TRACE_API(SetGrabbingStart(m_nDeviceCurSel, false));
+
+		return true;
+	}
+
+	return true;
+}
+
+/// 点击启动、停止主动采集按钮
 void CDemo_BasicDlg::OnBnClickedCheckStartGrab()
 {
 	if (m_nDeviceCurSel == -1)    return;
@@ -359,42 +500,28 @@ void CDemo_BasicDlg::OnBnClickedCheckStartGrab()
 	// 开启主动调用采集函数的线程
 	if (bCheck)
 	{
-		m_pMvDeviceManager->StartGrabImageThread(m_nDeviceCurSel, true);
+		// m_ListTrace.ResetContent();
 
-		((CButton*)GetDlgItem(IDC_CHECK_START_GRAB))->SetWindowText(_T("停止主动采集"));
+		StartGrabImageThread(true);
+
+		((CButton*)GetDlgItem(IDC_CHECK_START_GRAB))->SetWindowText(_T("停止主动采集线程"));
 
 		SetTimer(TIMERID_GET_FPS, 2000, NULL);//启动计时器显示帧率
 	}
 	else
 	{
-		m_pMvDeviceManager->StartGrabImageThread(m_nDeviceCurSel, false);
+		StartGrabImageThread(false);
 
-		((CButton*)GetDlgItem(IDC_CHECK_START_GRAB))->SetWindowText(_T("启动主动采集"));
+		((CButton*)GetDlgItem(IDC_CHECK_START_GRAB))->SetWindowText(_T("启动主动采集线程"));
 
 		KillTimer(TIMERID_GET_FPS);          //关闭计时器
 	}
 
 	CButton            *pBtnStartCallbackGrab = ((CButton*)GetDlgItem(IDC_CHECK_START_CALLBACK_GRAB));
 	CButton            *pBtnStartGrab = ((CButton*)GetDlgItem(IDC_CHECK_START_GRAB));
-	if (m_pMvDeviceManager->QueryIsCallbackGrab(m_nDeviceCurSel))
-	{
-		// 启动回调采集，就不能进行主动采集
-		pBtnStartGrab->EnableWindow(false);
-	}
-	else
-	{
-		pBtnStartGrab->EnableWindow(true);
-	}
 
-	if (m_pMvDeviceManager->IsGrabImageThreadRunning(m_nDeviceCurSel))
-	{
-		// 启动主动采集，就不能进行回调采集
-		pBtnStartCallbackGrab->EnableWindow(false);
-	}
-	else
-	{
-		pBtnStartCallbackGrab->EnableWindow(true);
-	}
+	pBtnStartCallbackGrab->EnableWindow(bCheck ? false : true);
+
 }
 
 //
@@ -405,9 +532,6 @@ void CDemo_BasicDlg::OnBnClickedCheckStartGrab()
 void CDemo_BasicDlg::Update_Interface_When_Device_Selected()
 {
 	if (m_nDeviceCurSel == -1)    return;
-
-	// 因为只有一个窗口，同一时刻只让被选择的设备显示
-	SetOnlySelectedDeviceDisplay();
 
 	// 首先更新设备信息
 	Update_ListBoxDeviceInfo();
@@ -424,77 +548,28 @@ void CDemo_BasicDlg::Update_Interface_When_Device_Selected()
 	CComboBox          *pComboBoxCommandNames = (CComboBox*)GetDlgItem(IDC_COMBO_COMMAND_NAMES);
 	CButton            *pBtnExecuteCommand = ((CButton*)GetDlgItem(IDC_BUTTON_EXECUTE_COMMAND));
 
-	// 判断设备是否打开
-	if (!m_pMvDeviceManager->QueryIsOpen(m_nDeviceCurSel))
-	{
-		// 如果设备没有打开，所有操作无效
-		pBtnOpenDevice->SetCheck(false);
-		pBtnOpenDevice->SetWindowText(_T("打开设备"));
+	/// 获取设备是否已经打开
+	bool bOpen;
+	TRACE_API(GetDeviceOpen(m_nDeviceCurSel, &bOpen));
 
-		pBtnStartCallbackGrab->SetCheck(false);
-		pBtnStartCallbackGrab->EnableWindow(false);
+	/// 更新设备开启关闭按钮
+	pBtnOpenDevice->SetCheck(bOpen);
+	pBtnOpenDevice->SetWindowText(bOpen ? _T("关闭设备") : _T("打开设备"));
 
-		pBtnStartGrab->SetCheck(false);
-		pBtnStartGrab->EnableWindow(false);
+	PMVD_GRABBING_CALLBACK pfCallback = NULL;
+	 /// 获取采集回调设置信息，如果获取的pfCallback为NULL，则表示采集回调没有开启
+	TRACE_API(GetGrabbingCallback(m_nDeviceCurSel, &pfCallback, NULL));
 
-		pComboBoxParamNames->ResetContent();
-		pComboBoxParamNames->EnableWindow(false);
+	/// 更新回调采集按钮
+	pBtnStartCallbackGrab->EnableWindow((m_hGrabImageThread[m_nDeviceCurSel] == NULL && bOpen) ? true : false);
+	pBtnStartCallbackGrab->SetWindowText(pfCallback == NULL ? _T("启动回调采集") : _T("停止回调采集"));
+	pBtnStartCallbackGrab->SetCheck(pfCallback == NULL ? false : true);
 
-		pComboBoxParamInfo->ResetContent();
-		pComboBoxParamInfo->ShowWindow(SW_SHOW);
-		pComboBoxParamInfo->EnableWindow(false);
+	/// 更新主动采集按钮
+	pBtnStartGrab->EnableWindow((pfCallback == NULL && bOpen) ? true : false);
+	pBtnStartGrab->SetWindowText(m_hGrabImageThread[m_nDeviceCurSel] == NULL ? _T("启动主动采集线程") : _T("停止主动采集线程"));
+	pBtnStartGrab->SetCheck(m_hGrabImageThread[m_nDeviceCurSel] == NULL ? false : true);
 
-
-		pSliderCtrl->ShowWindow(SW_HIDE);
-		pSliderCtrl->EnableWindow(false);
-
-		pSpin->ShowWindow(SW_HIDE);
-		pSpin->EnableWindow(false);
-		pEdit->ShowWindow(SW_HIDE);
-		pEdit->EnableWindow(false);
-
-		pComboBoxCommandNames->ResetContent();
-		pComboBoxCommandNames->EnableWindow(false);
-		pBtnExecuteCommand->EnableWindow(false);
-
-		return;
-	}
-
-	// 设备已经打开
-	pBtnOpenDevice->SetCheck(true);
-	pBtnOpenDevice->SetWindowText(_T("关闭设备"));
-
-	// 更新参数名称列表
-	pComboBoxParamNames->ResetContent();
-	pComboBoxParamNames->EnableWindow(true);
-	Update_ComboBoxParamNames();
-
-	// 更新命令名称列表
-	pComboBoxCommandNames->ResetContent();
-	pComboBoxCommandNames->EnableWindow(true);
-	pBtnExecuteCommand->EnableWindow(true);
-	Update_ComboBoxCommandNames();
-
-	// 更新回调采集、主动采集按钮
-	pBtnStartCallbackGrab->EnableWindow(true);
-	pBtnStartGrab->EnableWindow(true);
-
-
-	// 判断是否正在回调采集
-	if (m_pMvDeviceManager->QueryIsCallbackGrab(m_nDeviceCurSel))
-	{
-		// 回调采集已经启动，就不能进行主动采集
-		pBtnStartCallbackGrab->SetWindowText(_T("停止回调采集"));
-		pBtnStartCallbackGrab->SetCheck(true);
-		pBtnStartGrab->EnableWindow(false);
-	}
-	else
-	{
-		// 回调采集没有启动
-		pBtnStartCallbackGrab->SetWindowText(_T("启动回调采集"));
-		pBtnStartCallbackGrab->SetCheck(false);
-		pBtnStartGrab->EnableWindow(true);
-	}
 }
 
 // 当IDC_COMBO_DEVICES_LIST中的选择变化时需要调用更新设备信息列表
@@ -505,233 +580,53 @@ void CDemo_BasicDlg::Update_ListBoxDeviceInfo()
 	CListBox *pListBox = (CListBox*)GetDlgItem(IDC_LIST_DEVICE_INFO);
 	pListBox->ResetContent();
 
-	MVD_DEVICE_INFO    stDeviceInfo;
-	memset(&stDeviceInfo, 0, sizeof(MVD_DEVICE_INFO));
-
-	m_pMvDeviceManager->GetDeviceInfo(m_nDeviceCurSel, &stDeviceInfo);
-
 	TCHAR szDeviceInfo[128] = { 0 };
-	// 更新设备信息列表框
-	unsigned char ucIp1, ucIp2, ucIp3, ucIp4;
 
-	if (stDeviceInfo.DeviceInterfaceType == MVD_DEVICE_INTERFACE_TYPE_GIGE)
-	{
-		_stprintf(szDeviceInfo, _T("index = %d"), m_nDeviceCurSel);
-		pListBox->AddString(szDeviceInfo);
+	_stprintf_s(szDeviceInfo, 128, _T("uiDeviceModel = %d"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->uiDeviceModel);
+	pListBox->AddString(szDeviceInfo);
 
-		_stprintf(szDeviceInfo, _T("szDeviceModelName = %s"), stDeviceInfo.Info.stDeviceInfoGige.szDeviceModelName);
-		pListBox->AddString(szDeviceInfo);
+	_stprintf_s(szDeviceInfo, 128, _T("szModelName = %s"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->szModelName);
+	pListBox->AddString(szDeviceInfo);
 
-		_stprintf(szDeviceInfo, _T("szDeviceSerialNumber = %s"), stDeviceInfo.Info.stDeviceInfoGige.szDeviceSerialNumber);
-		pListBox->AddString(szDeviceInfo);
+	_stprintf_s(szDeviceInfo, 128, _T("uiSerialNumber = %d"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->uiSerialNumber);
+	pListBox->AddString(szDeviceInfo);
 
-		ucIp1 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0xff000000) >> 24);
-		ucIp2 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x00ff0000) >> 16);
-		ucIp3 = ((stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x0000ff00) >> 8);
-		ucIp4 = (stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent & 0x000000ff);
+	_stprintf_s(szDeviceInfo, 128, _T("FirmwareVersion = %d.%d"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->FirmwareVersion.sValue.ucMajor, m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->FirmwareVersion.sValue.ucMinor);
+	pListBox->AddString(szDeviceInfo);
 
-		_stprintf(szDeviceInfo, _T("uiDeviceIpCurrent = %d.%d.%d.%d"), ucIp4, ucIp3, ucIp2, ucIp1 );
-		//in_addr  iaDeviceIp;
-		//iaDeviceIp.S_un.S_addr = stDeviceInfo.Info.stDeviceInfoGige.uiDeviceIpCurrent;
-		//_stprintf(szDeviceInfo, _T("uiDeviceIpCurrent = %s"), inet_ntoa(iaDeviceIp));
-		pListBox->AddString(szDeviceInfo);
+	_stprintf_s(szDeviceInfo, 128, _T("FpgaVersion = %d.%d"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->FpgaVersion.sValue.ucMajor, m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->FpgaVersion.sValue.ucMinor);
+	pListBox->AddString(szDeviceInfo);
 
-		_stprintf(szDeviceInfo, _T("Device Mac = %02x-%02x-%02x-%02x-%02x-%02x"), stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[0], stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[1], stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[2], stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[3], stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[4], stDeviceInfo.Info.stDeviceInfoGige.ucDeviceMac[5]);
-		pListBox->AddString(szDeviceInfo);
-
-
-		_stprintf(szDeviceInfo, _T("Adapter Mac = %02x-%02x-%02x-%02x-%02x-%02x"), stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[0], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[1], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[2], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[3], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[4], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterMac[5]);
-		pListBox->AddString(szDeviceInfo);
-
-		ucIp1 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterIp & 0xff000000) >> 24);
-		ucIp2 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterIp & 0x00ff0000) >> 16);
-		ucIp3 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterIp & 0x0000ff00) >> 8);
-		ucIp4 = (stDeviceInfo.Info.stDeviceInfoGige.ulAdapterIp & 0x000000ff);
-
-		_stprintf(szDeviceInfo, _T("Adapter Ip = %d.%d.%d.%d"), ucIp4, ucIp3, ucIp2, ucIp1);
-		pListBox->AddString(szDeviceInfo);
-
-		ucIp1 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterSubnetMask & 0xff000000) >> 24);
-		ucIp2 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterSubnetMask & 0x00ff0000) >> 16);
-		ucIp3 = ((stDeviceInfo.Info.stDeviceInfoGige.ulAdapterSubnetMask & 0x0000ff00) >> 8);
-		ucIp4 = (stDeviceInfo.Info.stDeviceInfoGige.ulAdapterSubnetMask & 0x000000ff);
-
-		_stprintf(szDeviceInfo, _T("Adapter SubnetMask = %d.%d.%d.%d"), ucIp4, ucIp3, ucIp2, ucIp1);
-		pListBox->AddString(szDeviceInfo);
-
-		_stprintf(szDeviceInfo, _T("Adapter FriendlyName = %s"), stDeviceInfo.Info.stDeviceInfoGige.szAdapterFriendlyName);
-		pListBox->AddString(szDeviceInfo);
-
-		_stprintf(szDeviceInfo, _T("Adapter Description = %s"), stDeviceInfo.Info.stDeviceInfoGige.szAdapterDescription);
-		pListBox->AddString(szDeviceInfo);
-
-		_stprintf(szDeviceInfo, _T("Adapter Ip = %d-%d-%d-%d"), stDeviceInfo.Info.stDeviceInfoGige.ucAdapterIp[0], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterIp[1], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterIp[2], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterIp[3]);
-		pListBox->AddString(szDeviceInfo);
-
-		_stprintf(szDeviceInfo, _T("Adapter Dns = %d-%d-%d-%d"), stDeviceInfo.Info.stDeviceInfoGige.ucAdapterDns[0], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterDns[1], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterDns[2], stDeviceInfo.Info.stDeviceInfoGige.ucAdapterDns[3]);
-		pListBox->AddString(szDeviceInfo);
-	}
 }
 
+/// 打开快捷设置页面
+void CDemo_BasicDlg::OnBnClickedButtonSetting()
+{
+	TRACE_API(OpenSettingPage(m_nDeviceCurSel, m_hWnd, 0, 0));
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//                                      下面代码没有实现，不需参考
+//
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 根据选择的设备，更新参数名称下拉列表
 void CDemo_BasicDlg::Update_ComboBoxParamNames()
 {
 	if (m_nDeviceCurSel == -1)    return;
 
-	// 查询可以设置的参数名，填入参数名下拉列表框
-	MVD_QUERY_INFO stQueryInfo = { (MVD_VALUE_TYPE)0 };
-	m_pMvDeviceManager->QueryParamNames(m_nDeviceCurSel, &stQueryInfo);
-
-	CComboBox    *pComboBoxParamNames = (CComboBox*)GetDlgItem(IDC_COMBO_PARAM_NAMES);
-	pComboBoxParamNames->ResetContent();
-
-	// 将查询到的参数名填入下拉列表框，这些名字可以作为MVD_SetParam和MVD_GetParam函数的第二个参数
-	for (int i = 0; i < stQueryInfo.nValueNum; i++)
-	{
-		ASSERT(stQueryInfo.enInfoType == MVD_VALUE_TYPE_STRING);
-		pComboBoxParamNames->AddString(stQueryInfo.unValues[i].pszValue);
-	}
-
-	// 默认选择第一个参数名
-	pComboBoxParamNames->SetCurSel(0);
 
 	// 根据选择的参数名，更新相应的参数信息
 	Update_Interface_When_ParamNames_Selected();
 }
 
-// 更新设备支持的命令名下拉列表
-void CDemo_BasicDlg::Update_ComboBoxCommandNames()
-{
-	if (m_nDeviceCurSel == -1)    return;
 
-	// 查询可以执行的命令名，填入命令名列表框
-	MVD_QUERY_INFO stQueryInfo = { (MVD_VALUE_TYPE)0 };
-	m_pMvDeviceManager->QueryCommandNames(m_nDeviceCurSel, &stQueryInfo);
-
-	CComboBox    *pComboBoxCommandNames = (CComboBox*)GetDlgItem(IDC_COMBO_COMMAND_NAMES);
-	pComboBoxCommandNames->ResetContent();
-
-	for (int i = 0; i < stQueryInfo.nValueNum; i++)
-	{
-		pComboBoxCommandNames->AddString(stQueryInfo.unValues[i].pszValue);
-	}
-
-	pComboBoxCommandNames->SetCurSel(0);
-
-}
 
 // 当"参数名下拉列表"选择变化时，更新相应的参数信息。
 void CDemo_BasicDlg::Update_Interface_When_ParamNames_Selected()
 {
 	if (m_nDeviceCurSel == -1)    return;
-
-	// 首先获取参数名列表的选择项，并获取这个选择的参数名
-	CComboBox    *pComboBoxParamNames = (CComboBox*)GetDlgItem(IDC_COMBO_PARAM_NAMES);
-	int nParameterSel = pComboBoxParamNames->GetCurSel();
-
-	TCHAR chParamName[128] = { 0 };
-	pComboBoxParamNames->GetLBText(nParameterSel, chParamName);
-
-	// 获取这个参数的信息
-	MVD_GET_PARAME_VALUE stGetParamInfo = { (MVD_VALUE_TYPE)0 };
-	m_pMvDeviceManager->GetParam(m_nDeviceCurSel, chParamName, &stGetParamInfo);
-
-	CComboBox          *pComboBoxParamInfo = (CComboBox*)GetDlgItem(IDC_COMBO_PARAM_INFO);
-	CSliderCtrl        *pSliderCtrl = (CSliderCtrl*)GetDlgItem(IDC_SLIDER_PARAM_VALUE);
-	CSpinButtonCtrl    *pSpin = (CSpinButtonCtrl*)GetDlgItem(IDC_SPIN_PARAM_VALUE);
-	CEdit              *pEdit = (CEdit*)GetDlgItem(IDC_EDIT_PARAM_VALUE);
-
-	// 对于MVD_VALUE_TYPE_STRING类型的参数，我们用下拉列表框来显示
-	if (stGetParamInfo.enParamType == MVD_VALUE_TYPE_STRING)
-	{
-		pComboBoxParamInfo->ShowWindow(SW_SHOW);
-		pComboBoxParamInfo->EnableWindow(true);
-
-		pSliderCtrl->ShowWindow(SW_HIDE);
-		pSliderCtrl->EnableWindow(false);
-		pSpin->ShowWindow(SW_HIDE);
-		pSpin->EnableWindow(false);
-		pEdit->ShowWindow(SW_HIDE);
-		pEdit->EnableWindow(false);
-
-		pComboBoxParamInfo->ResetContent();
-
-		for (int i = 0; i < stGetParamInfo.nValueNum; i++)
-		{
-			pComboBoxParamInfo->AddString(stGetParamInfo.unValues[i].pszValue);
-		}
-
-		// 使当前值被选择
-		int nCurSel = pComboBoxParamInfo->FindString(0, stGetParamInfo.unValueCur.pszValue);
-		pComboBoxParamInfo->SetCurSel(nCurSel);
-
-		if (stGetParamInfo.enAccessMode == MVD_ACCESS_MODE_RO)    pComboBoxParamInfo->EnableWindow(false);
-		else                                                      pComboBoxParamInfo->EnableWindow(true);
-	}
-
-	// 对于MVD_VALUE_TYPE_INT并且nValueNum != 0的类型参数，也就是参数的值是离散的整型数据，我们也用下拉列表列出
-	else if (stGetParamInfo.enParamType == MVD_VALUE_TYPE_INT && stGetParamInfo.nValueNum != 0)
-	{
-		pComboBoxParamInfo->ShowWindow(SW_SHOW);
-		pComboBoxParamInfo->EnableWindow(true);
-
-		pSliderCtrl->ShowWindow(SW_HIDE);
-		pSliderCtrl->EnableWindow(false);
-		pSpin->ShowWindow(SW_HIDE);
-		pSpin->EnableWindow(false);
-		pEdit->ShowWindow(SW_HIDE);
-		pEdit->EnableWindow(false);
-
-		pComboBoxParamInfo->ResetContent();
-		for (int i = 0; i < stGetParamInfo.nValueNum; i++)
-		{
-			pComboBoxParamInfo->AddString(_itot(stGetParamInfo.unValues[i].nValue, NULL, 10));
-		}
-
-		// 使当前值被选择
-		int nCurSel = pComboBoxParamInfo->FindString(0, _itot(stGetParamInfo.unValueCur.nValue, NULL, 10));
-		pComboBoxParamInfo->SetCurSel(nCurSel);
-
-		if (stGetParamInfo.enAccessMode == MVD_ACCESS_MODE_RO)    pComboBoxParamInfo->EnableWindow(false);
-		else                                                      pComboBoxParamInfo->EnableWindow(true);
-
-	}
-
-	// 对于MVD_VALUE_TYPE_INT并且nValueNum == 0的类型参数，也就是参数的值是连续的整型数据，我们用滑动控件来设置显示
-	else if (stGetParamInfo.enParamType == MVD_VALUE_TYPE_INT && stGetParamInfo.nValueNum == 0)
-	{
-		pComboBoxParamInfo->ShowWindow(SW_HIDE);
-		pComboBoxParamInfo->EnableWindow(false);
-
-		pSliderCtrl->ShowWindow(SW_SHOW);
-		pSliderCtrl->EnableWindow(true);
-		pSpin->ShowWindow(SW_SHOW);
-		pSpin->EnableWindow(true);
-		pEdit->ShowWindow(SW_SHOW);
-		pEdit->EnableWindow(true);
-
-		pSliderCtrl->SetRange(stGetParamInfo.unValueMin.nValue, stGetParamInfo.unValueMax.nValue);
-		pSliderCtrl->SetPos(stGetParamInfo.unValueCur.nValue);
-		pSliderCtrl->SetLineSize(stGetParamInfo.unValueInc.nValue);    // 左右键移动间隔
-
-		DWORD   dwStyle = pSpin->GetStyle();
-		pSpin->SetRange32(stGetParamInfo.unValueMin.nValue, stGetParamInfo.unValueMax.nValue);
-		pSpin->SetPos32(stGetParamInfo.unValueCur.nValue);
-
-		if (stGetParamInfo.enAccessMode == MVD_ACCESS_MODE_RO)
-		{
-			pSliderCtrl->EnableWindow(false);
-			pSpin->EnableWindow(false);
-			pEdit->EnableWindow(false);
-		}
-		else
-		{
-			pSliderCtrl->EnableWindow(true);
-			pSpin->EnableWindow(false);
-			pEdit->EnableWindow(false);
-		}
-
-	}
 
 }
 
@@ -759,43 +654,8 @@ void CDemo_BasicDlg::OnCbnSelchangeComboParamInfo()
 	TCHAR chParamValue[128] = { 0 };
 	pComboBoxParameterValue->GetLBText(nParameterValueSel, chParamValue);
 
-	// 获取此参数的完整信息，根据stGetParam.enParamType获取参数值的类型（整型，浮点型，字符型）
-	MVD_GET_PARAME_VALUE stGetParam;
-	MVD_GetParam(m_nDeviceCurSel, chParamName, &stGetParam);
-	if (stGetParam.enAccessMode == MVD_ACCESS_MODE_RO)    return;
 
-	// 设置参数值
-	MVD_SET_PARAME_VALUE stSetParam;
-
-	stSetParam.enParamType = stGetParam.enParamType;
-
-	// 根据参数值的类型，设置相应的数值
-	if (stSetParam.enParamType == MVD_VALUE_TYPE_STRING)
-	{// 字符型
-		stSetParam.unValue.pszValue = chParamValue;
-	}
-	else if (stSetParam.enParamType == MVD_VALUE_TYPE_INT)
-	{// 整型
-		stSetParam.unValue.nValue = _ttoi(chParamValue);
-	}
-
-	MVD_SetParam(m_nDeviceCurSel, chParamName, stSetParam);
 }
-
-
-void CDemo_BasicDlg::OnBnClickedButtonExecuteCommand()
-{
-	if (m_nDeviceCurSel == -1)    return;
-
-	CComboBox    *pComboBoxCommandNames = (CComboBox*)GetDlgItem(IDC_COMBO_COMMAND_NAMES);
-	int nCommandSel = pComboBoxCommandNames->GetCurSel();
-
-	TCHAR chCommandName[128] = { 0 };
-	pComboBoxCommandNames->GetLBText(nCommandSel, chCommandName);
-
-	MVD_ExecuteCommand(m_nDeviceCurSel, chCommandName);
-}
-
 void CDemo_BasicDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
 	if (m_nDeviceCurSel == -1)    return;
@@ -810,51 +670,29 @@ void CDemo_BasicDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	TCHAR chParamName[128] = { 0 };
 	pComboBoxParamNames->GetLBText(nParameterSel, chParamName);
 
-	MVD_GET_PARAME_VALUE stGetParam;
-	MVD_GetParam(m_nDeviceCurSel, chParamName, &stGetParam);
-
-	switch (pScrollBar->GetDlgCtrlID())
-	{
-	case IDC_SLIDER_PARAM_VALUE:
-		MVD_SET_PARAME_VALUE stSetParam;
-		stSetParam.enParamType = stGetParam.enParamType;
-		stSetParam.unValue.nValue = nValue;
-		MVD_SetParam(m_nDeviceCurSel, chParamName, stSetParam);
-
-		pSpin->SetPos32(nValue);
-
-		break;
-	default:
-		break;
-	}
 
 	CDialogEx::OnHScroll(nSBCode, nPos, pScrollBar);
 }
 
-void CDemo_BasicDlg::OnTimer(UINT_PTR nIDEvent)
+// 更新设备支持的命令名下拉列表
+void CDemo_BasicDlg::Update_ComboBoxCommandNames()
 {
 	if (m_nDeviceCurSel == -1)    return;
-	// TODO:  在此添加消息处理程序代码和/或调用默认值
-	if (nIDEvent == TIMERID_GET_FPS)//显示帧率计时器
-	{
-		float fFps = m_pMvDeviceManager->QueryGrabFps(m_nDeviceCurSel);
-		TCHAR   szFps[32] = { '\0' };
-		_stprintf(szFps, _T("Grab Fps = %0.2f"), fFps);
-		SetWindowText(szFps);
-	}
-
-	CDialogEx::OnTimer(nIDEvent);
 }
 
-void CDemo_BasicDlg::OnBnClickedCheckSettings()
+void CDemo_BasicDlg::OnBnClickedButtonExecuteCommand()
 {
-	// TODO:  在此添加控件通知处理程序代码
-	CButton            *pBtnSettings = ((CButton*)GetDlgItem(IDC_CHECK_SETTINGS));
+	if (m_nDeviceCurSel == -1)    return;
 
-	BOOL bCheck = pBtnSettings->GetCheck();
-	
-	if (bCheck)
-		MVD_OpenSettings(m_hWnd, 0, 0);
-	else
-		MVD_CloseSettings();
+	CComboBox    *pComboBoxCommandNames = (CComboBox*)GetDlgItem(IDC_COMBO_COMMAND_NAMES);
+	int nCommandSel = pComboBoxCommandNames->GetCurSel();
+
+	TCHAR chCommandName[128] = { 0 };
+	pComboBoxCommandNames->GetLBText(nCommandSel, chCommandName);
+
 }
+
+
+
+
+

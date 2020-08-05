@@ -1,0 +1,8 @@
+﻿  stdafx.cpp
+c:\program files (x86)\microsoft visual studio 12.0\vc\atlmfc\include\afx.h(38): warning C4996: 'MBCS_Support_Deprecated_In_MFC': MBCS support in MFC is deprecated and may be removed in a future version of MFC.
+          c:\program files (x86)\microsoft visual studio 12.0\vc\atlmfc\include\afx.h(33) : 参见“MBCS_Support_Deprecated_In_MFC”的声明
+  Demo_BasicDlg.cpp
+  Demo_Basic.cpp
+  正在生成代码...
+  Demo_Basic.vcxproj -> I:\20200203\git.20191111\github\github.MachineVision-Device-Development\Development\Samples\vs\Demo_Basic\.\x86\Debug.MultiByte\Demo_Basic_x86_MultiByte.exe
+  已复制         1 个文件。

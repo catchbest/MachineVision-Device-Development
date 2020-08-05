@@ -36,16 +36,23 @@
 
 #include <afxcontrolbars.h>     // 功能区和控件条的 MFC 支持
 
-// CHAR2WCHAR(szA, szW, sizeof(szW) / sizeof(szW[0]));
-bool CHAR2WCHAR(const char* lpcszStr, wchar_t *lpwszStr, unsigned int dwSize);
-
+#include "../../../MVDAPI.inc/MVDAPI_ReturnCode.h"
+#include "../../../MVDAPI.inc/MVDAPI_String.h"
 #include "../../../MVDAPI.inc/MVDAPI.h"
 
 
 #ifdef _WIN64
-#pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI.lib" )
+#ifdef _UNICODE
+#pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_Unicode.lib" )
 #else
-#pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI.lib" )
+#pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_MultiByte.lib" )
+#endif
+#else
+#ifdef _UNICODE
+#pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_Unicode.lib" )
+#else
+#pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_MultiByte.lib" )
+#endif
 #endif
 
 #ifdef _UNICODE

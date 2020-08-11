@@ -1,6 +1,17 @@
 #ifndef __MVDAPI_H__
 #define __MVDAPI_H__
 
+/// -----------------------------------------------------------------------------
+///
+/// @file    MVDAPI.h
+/// @author  Mike
+/// @version 0.1
+/// @date    2020.08.06
+/// @brief   MVDAPI应用开发接口函数声明头文件
+/// @details 所有Get起始的函数，如果有多个可获取的参数时，可以只传入一个或多个有效地址，不需获取的参数只需传入NULL指针。
+///
+/// -----------------------------------------------------------------------------
+
 #if (defined (_WIN32) || defined(_WIN64))
 #    if defined(MVDAPI_EXPORTS)
 #        define MVD_API __declspec(dllexport)
@@ -29,67 +40,99 @@ extern "C" {
 #include "MVDAPI_String.h"
 
 
-	/// @brief     设置开发包版本。
+	/// -----------------------------------------------------------------------------
+	///
+	/// @brief     获取MVDAPI开发包版本。
+	/// @param     [OUT]pSdkVersion  返回SDK版本号。
+	///
+	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetSdkVersion(OUT MVD_VERSION *pSdkVersion);
 
+	/// -----------------------------------------------------------------------------
+	///
 	/// @brief     设置开发包使用的语言。
+	/// @attention 语言的设置将影响MVDAPI_String.h中函数返回的字符串信息(立即生效)以及OpenSettingPage界面的信息（再次打开生效）。
+	/// @param     [IN]Language    设置的语言
+	///
+	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall SetLanguage(IN MVD_LANGUAGE Language);
 
+	/// -----------------------------------------------------------------------------
+	///
 	/// @brief     获取开发包使用的语言
+	/// @param     [OUT]pLanguage   返回当前设置的语言。
+	///
+	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetLanguage(IN MVD_LANGUAGE *pLanguage);
 
     /// -----------------------------------------------------------------------------
-    ///
-    /// @brief     初始化SDK库，并枚举指定接口的设备，并返回设备信息列表。
+	///
+    /// @brief     初始化SDK库，枚举指定接口的设备，并返回设备信息列表。
     /// @attention 此函数可连续调用，但连续调用不会改变设备的数目，需要调用Uninitial之后再次调用此函数才可重新获取所连接设备数目和信息。
+	/// @attention 用户获取到的MVD_DEVICE_INFORMATION指针数组可通过调用GetDeviceIndex来获取设备的索引（nIndex）
     /// @param     [IN]nDeviceInterfaceType 设定要枚举的设备接口类型，请参考MVD_DEVICE_INTERFACE_TYPE枚举类型的定义，可进行组合。
     /// @param     [OUT]pstDeviceInfoList   成功返回后，设备信息的指针会被填写进此结构中。
-    /// @return    MVD_SUCCESS        表示成功。
-    ///            其它错误情况请参见MVD_STATUS_CODE。
-    ///
+    /// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       MVD_DEVICE_INTERFACE_TYPE
+	/// @note      pstDeviceInfoList指向SDK内部的内存地址，这段地址用户不可修改。
+	///
     /// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall Initial(IN const unsigned int uiDeviceInterfaceType, OUT MVD_DEVICE_INFORMATION_LIST* pstDeviceInformationList);
 
     /// -----------------------------------------------------------------------------
-    ///
+	///
     /// @brief     反初始化SDK库，释放所有资源并自动关闭没有关闭的设备。
     /// @attention 此函数必须在进程退出之前被调用，以释放库里分配的资源。也可以在程序运行中调用，然后再次调用MVD_Initial以重新初始化库并获取设备信息列表。
     /// @param     无。
-    /// @return    MVD_SUCCESS        表示成功。
-    ///            其它错误情况请参见MVD_STATUS_CODE。
-    ///
-    /// -----------------------------------------------------------------------------
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       Initial
+	///
+	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall Uninitial();
 
+	///
 	/// @brief     设置设备序列号
-	/// @attention 设备序列号是同型号设备用于身份的唯一标识，如果多台设备使用，需保证统一型号设备具有不同的设备序列号
+	/// @attention 设备序列号是同型号设备用于身份的唯一标识，如果多台设备使用，需保证同一型号设备具有不同的设备序列号
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       MVDAPI_ReturnCode.h
+	///
 	MVD_API MVD_ReturnCode __stdcall SetDeviceSerialNumber(IN int nIndex, unsigned int uiSerialNumber);
 
+	///
 	/// @brief     获取设备序列号
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       MVDAPI_ReturnCode.h
+	///
 	MVD_API MVD_ReturnCode __stdcall GetDeviceSerialNumber(IN int nIndex, unsigned int *puiSerialNumber);
 
 	/// -----------------------------------------------------------------------------
 	///
 	/// @brief     通过设备信息，获取设备所对应的索引（这个索引可以看作是这个设备的句柄)。
 	/// @attention 对于多台设备操作时，一定要先调用这个函数以确定设备的索引值，这个索引值将作为对设备操作函数的第一个参数。注意不能有多台设备信息相同的设备同时存在。
-	/// @param     [IN]pDeviceInformation 通过调用Initial获取到的设备信息，注意这个函数是通过指针判断，所以不要自己分配保存设备的信息进行传入，要使用Initial返回值保留的信息指针。
-	/// @return    返回设备的索引值，注意如果为-1表示无效的设备信息。
+	/// @attention pDeviceInformation需要使用通过调用Initial获取到的设备信息指针数组里的指针，注意这个函数是通过指针判断，所以不要把自己分配保存设备的信息进行传入。
+	/// @param     [IN]pDeviceInformation 
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API int __stdcall GetDeviceIndex(IN MVD_DEVICE_INFORMATION *pDeviceInformation);
 
 	/// @brief     通过索引获取设备信息。
 	/// @attention 注意，获取的是SDK内部对应的设备信息内存地址，用户不可改写其内容
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	MVD_API MVD_ReturnCode __stdcall GetDeviceInformation(IN int nIndex, OUT MVD_DEVICE_INFORMATION **ppDeviceInformation);
 
 	/// @brief     打开或关闭指定的设备
 	/// @attention 多进程控制时，只有其他进程没有打开此设备，才可以对其打开操作。
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	///
 	MVD_API MVD_ReturnCode __stdcall SetDeviceOpen(IN int nIndex, bool bOpen);
 
 
 	/// @brief     获取设备开启状态
 	/// @attention 本进程或其他进程是否此设备打开
+	/// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	///
 	MVD_API MVD_ReturnCode __stdcall GetDeviceOpen(IN int nIndex, bool *pbOpen);
 
 	/// -----------------------------------------------------------------------------
@@ -97,9 +140,8 @@ extern "C" {
 	/// @brief     获取默认最大的ROI(感兴趣区域)信息。
 	/// @attention 默认ROI也就是图像传感器最大视场时的设置。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]pRoiMaxSize   ROI(感兴趣区域)最大设置值。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]pRoiMaxSize   ROI(感兴趣区域)最大设置值。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetRoiMaxSize(IN int nIndex, OUT MVD_ROI_SIZE *pRoiMaxSize);
@@ -109,9 +151,8 @@ extern "C" {
 	/// @brief     获取当前的ROI(感兴趣区域)信息。
 	/// @attention 无
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]pRoiSize      当前ROI(感兴趣区域)大小。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]pRoiSize      当前ROI(感兴趣区域)大小。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetRoiSize(IN int nIndex, OUT MVD_ROI_SIZE *pRoiSize);
@@ -122,9 +163,8 @@ extern "C" {
 	/// @attention 注意，这个函数不可以在启动采集后调用，必须要停止数据流后调用。
 	///            另外，由于视场的设置根据图像传感器的不同，内部有可能会对设置的值进行调整，调整后的视场真实值可以通过GetRoiSize再次获取得到。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [IN]RoiSize        需要设置的ROI(感兴趣区域)大小。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [IN]RoiSize        需要设置的ROI(感兴趣区域)大小。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall SetRoiSize(IN int nIndex, IN MVD_ROI_SIZE RoiSize);
@@ -203,11 +243,10 @@ extern "C" {
 	/// @brief     获取当前的ROI视场设置下，可设置的起始列(水平偏移)的最大值、最小值、默认值（默认值是指保持ROI视场在全视场的水平中心位置的值）。
 	/// @attention 如果通过SetFieldOfView改变了ROI，需要再次调用重新获取。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]puiMin        当前ROI(感兴趣区域)最小可设置的水平偏移。
-	///            [OUT]puiMax        当前ROI(感兴趣区域)最大可设置的水平偏移。
-	///            [OUT]puiDef        当前ROI(感兴趣区域)居中时的水平偏移。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]puiMin        当前ROI(感兴趣区域)最小可设置的水平偏移。
+	/// @param     [OUT]puiMax        当前ROI(感兴趣区域)最大可设置的水平偏移。
+	/// @param     [OUT]puiDef        当前ROI(感兴趣区域)居中时的水平偏移。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetRoiColStartRange(IN int nIndex, OUT unsigned int *puiMin, OUT unsigned int *puiMax, OUT unsigned int *puiDef);
@@ -218,9 +257,8 @@ extern "C" {
 	/// @brief     设置ROI(感兴趣区域)的在全阵列中的起始列（水平偏移）。
 	/// @attention 如果通过SetFieldOfView改变了ROI，需要再次调用重新获取。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [IN]uiValue        需要设置的ROI(感兴趣区域)水平偏移值。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [IN]uiValue        需要设置的ROI(感兴趣区域)水平偏移值。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall SetRoiColStart(IN int nIndex, IN unsigned int uiValue);
@@ -230,9 +268,8 @@ extern "C" {
 	/// @brief     设置ROI(感兴趣区域)的在全阵列中的起始列（水平偏移）。
 	/// @attention 如果通过SetFieldOfView改变了ROI，需要再次调用重新获取。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]puiValue      返回当前ROI(感兴趣区域)水平偏移值。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]puiValue      返回当前ROI(感兴趣区域)水平偏移值。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetRoiColStart(IN int nIndex, OUT unsigned int *puiValue);
@@ -242,11 +279,10 @@ extern "C" {
 	/// @brief     获取当前的ROI视场设置下，可设置的起始行(垂直偏移)的最大值、最小值、默认值（默认值是指保持ROI视场在全视场的垂直中心位置的值）。
 	/// @attention 如果通过SetFieldOfView改变了ROI，需要再次调用重新获取。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]puiMin        当前ROI(感兴趣区域)最小可设置的垂直偏移。
-	///            [OUT]puiMax        当前ROI(感兴趣区域)最大可设置的垂直偏移。
-	///            [OUT]puiDef        当前ROI(感兴趣区域)居中时的垂直偏移。
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]puiMin        当前ROI(感兴趣区域)最小可设置的垂直偏移。
+	/// @param     [OUT]puiMax        当前ROI(感兴趣区域)最大可设置的垂直偏移。
+	/// @param     [OUT]puiDef        当前ROI(感兴趣区域)居中时的垂直偏移。
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetRoiRowStartRange(IN int nIndex, OUT unsigned int *puiMin, OUT unsigned int *puiMax, OUT unsigned int *puiDef);
@@ -332,23 +368,44 @@ extern "C" {
 	/// @brief     设置色彩效正模式
 	MVD_API MVD_ReturnCode __stdcall SetColorCorrectionMode(IN int nIndex, MVD_COLOR_CORRECTION_MODE ColorCorrectionMode);
 
+	///
 	/// @brief     手动设置色彩效正系数矩阵（范围推荐-10-10）
 	/// @attention 只有在在色彩效正模式设置为CCM_SOFTWARE_MANUAL或CCM_HARDWARE_MANUAL模式时才可调用
+	/// @see       SetColorCorrectionMode
+	/// @see       GetColorCorrectionMode
+	///
+
 	MVD_API MVD_ReturnCode __stdcall SetColorCorrectionMatrix(IN int nIndex, float fMatrix[3][3]);
+
+	/// @brief     获取当前色彩效正系数矩阵。
+	/// @attention 也可以通过此函数实时获取自动色彩效正后的系数矩阵。
+	/// @see       SetColorCorrectionMode
+	/// @see       GetColorCorrectionMode
+	///
+
 	MVD_API MVD_ReturnCode __stdcall GetColorCorrectionMatrix(IN int nIndex, float fMatrix[3][3]);
 
 	/// @brief     设置色彩效正预设值
 	/// @attention 这个设置只有在色彩效正模式设置为CCM_SOFTWARE_PRESETTING或CCM_HARDWARE_PRESETTING模式时才生效
+	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
+	/// @see       SetColorCorrectionMode
+	/// @see       GetColorCorrectionMode
+	///
 	MVD_API MVD_ReturnCode __stdcall SetColorCorrectionPresetting(IN int nIndex, MVD_COLOR_TEMPERATURE ColorTemperature);
 
 	/// @brief     获取色彩效正预设值
+	/// @see       SetColorCorrectionMode
+	/// @see       GetColorCorrectionMode
+	///
 	MVD_API MVD_ReturnCode __stdcall GetColorCorrectionPresetting(IN int nIndex, MVD_COLOR_TEMPERATURE *pColorTemperature);
 
 	/// @brief     获取图像传感器ADC转换精度（比特位数）
+	/// @see       GetAdcCompandingMode
 	MVD_API MVD_ReturnCode __stdcall GetAdcResolution(IN int nIndex, unsigned char *pucAdcResolution);
 
 
 	/// @brief     设置相机ADC精度转换为8比特的模式
+	/// @see       SetAdcCompandingMode
 	MVD_API MVD_ReturnCode __stdcall SetAdcCompandingMode(IN int nIndex, MVD_ADC_COMPANDING_MODE CompandingMode);
 
 
@@ -357,13 +414,16 @@ extern "C" {
 
 	/// @brief     设置位截取模式
 	/// @attention 当CompandingMode为ACM_EXTRACT时才可以生效
+	/// @see       SetAdcCompandingMode
 	MVD_API MVD_ReturnCode __stdcall SetAdcCompandingExtractMode(IN int nIndex, MVD_EXTRACT_MODE ExtractMode);
 	
 	/// @brief     获取当前位截取模式
+	/// @see       SetAdcCompandingMode
 	MVD_API MVD_ReturnCode __stdcall GetAdcCompandingExtractMode(IN int nIndex, MVD_EXTRACT_MODE *pExtractMode);
 
 	/// @brief     设置压缩查找表
 	/// @attention 当CompandingMode为ACM_LUT时才可以生效，LUT查找表元素个数必须为2^AdcResolution（AdcResolution通过GetAdcResolution函数获取）
+	/// @see       GetAdcResolution
 	MVD_API MVD_ReturnCode __stdcall SetAdcCompandingLut(IN int nIndex, IN  unsigned char *pucLut, unsigned short usLutBytesSize);
 
 	/// @brief     获取当前压缩查找表
@@ -458,9 +518,9 @@ extern "C" {
 	/// @brief     保存当前设备状态到指定的用户预设组。
 	/// @attention 将当前设备所有相关信息保存到指定的用户预设组，方便用户通过LoadUserPresetting进行重新加载。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [IN]UserPresetting 用户预设组号，参考MVD_USER_PRESETTING枚举类型
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [IN]UserPresetting 用户预设组号，参考MVD_USER_PRESETTING枚举类型
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       LoadUserPresetting
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall SaveUserPresetting(IN int nIndex, IN MVD_USER_PRESETTING UserPresetting);
@@ -471,9 +531,9 @@ extern "C" {
 	/// @brief     加载指定的用户预设组。
 	/// @attention 将之前保存的、相应的用户预设组信息重新加载。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [IN]UserPresetting 用户预设组号，参考MVD_USER_PRESETTING枚举类型
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [IN]UserPresetting 用户预设组号，参考MVD_USER_PRESETTING枚举类型
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       SaveUserPresetting
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall LoadUserPresetting(IN int nIndex, IN MVD_USER_PRESETTING UserPresetting);
@@ -484,9 +544,9 @@ extern "C" {
 	/// @brief     设置默认加载的预设组。
 	/// @attention 设置默认加载预设组后，每次调用Initial会按照此预设组的信息对设备进行加载设置。
 	/// @param     [IN]nIndex         设备对应的索引，通过GetDeviceIndex获取。
-	///            [IN]UserPresetting 要设置为默认加载的用户预设组，参考MVD_USER_PRESETTING枚举类型
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [IN]UserPresetting 要设置为默认加载的用户预设组，参考MVD_USER_PRESETTING枚举类型
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       GetDefaultUserPresetting
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall SetDefaultUserPresetting(IN int nIndex, IN MVD_USER_PRESETTING UserPresetting);
@@ -497,12 +557,14 @@ extern "C" {
 	/// @brief     获取默认加载的预设组。
 	/// @attention 如果没有预设组？？。
 	/// @param     [IN]nIndex           设备对应的索引，通过GetDeviceIndex获取。
-	///            [OUT]pUserPresetting 返回当前默认的预设组
-	/// @return    MVD_SUCCESS        表示成功。
-	///            其它错误情况请参见MVD_STATUS_CODE。
+	/// @param     [OUT]pUserPresetting 返回当前默认的预设组
+	/// @return    MVD_SUCCESS        表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
+	/// @see       SetDefaultUserPresetting
 	///
 	/// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall GetDefaultUserPresetting(IN int nIndex, OUT MVD_USER_PRESETTING *pUserPresetting);
+
+	MVD_API bool __stdcall IsUserPresettingAvailable(IN int nIndex, IN MVD_USER_PRESETTING UserPresetting);
 
 #ifdef __cplusplus
 }

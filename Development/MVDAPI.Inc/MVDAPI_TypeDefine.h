@@ -1,6 +1,17 @@
 #ifndef __MVDAPI_TYPE_H__
 #define __MVDAPI_TYPE_H__
 
+/// -----------------------------------------------------------------------------
+///
+/// @file    MVDAPI_TypeDefine.h
+/// @author  Mike.Guo
+/// @version 0.1
+/// @date    2020.08.06
+/// @brief   MVDAPI应用开发接口数据类型定义头文件
+///
+/// -----------------------------------------------------------------------------
+
+
 #include <tchar.h>
 
 typedef int MVD_ReturnCode;         ///< MVDAPI函数返回码
@@ -158,6 +169,13 @@ enum MVD_IMAGE_FORMAT
 	IF_RGB32,
 	IF_BGR24,
 	IF_BGR32,
+	IF_RAW16,
+	IF_GRAY16,
+	IF_RGB48,
+	IF_RGB64,
+	IF_BGR48,
+	IF_BGR64,
+
 };
 
 /// 压缩8bit模式

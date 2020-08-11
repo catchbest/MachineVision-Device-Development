@@ -42,17 +42,17 @@
 
 
 #ifdef _WIN64
-#ifdef _UNICODE
-#pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_Unicode.lib" )
+#    ifdef _UNICODE
+#        pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_Unicode.lib" )
+#    else
+#        pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_MultiByte.lib" )
+#    endif
 #else
-#pragma comment( lib, "../../../MVDAPI.Lib/x64/MVDAPI_x64_MultiByte.lib" )
-#endif
-#else
-#ifdef _UNICODE
-#pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_Unicode.lib" )
-#else
-#pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_MultiByte.lib" )
-#endif
+#    ifdef _UNICODE
+#        pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_Unicode.lib" )
+#    else
+#        pragma comment( lib, "../../../MVDAPI.Lib/x86/MVDAPI_x86_MultiByte.lib" )
+#    endif
 #endif
 
 #ifdef _UNICODE

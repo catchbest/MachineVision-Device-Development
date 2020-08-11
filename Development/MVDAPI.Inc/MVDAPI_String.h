@@ -1,6 +1,18 @@
 #ifndef __MVDAPI_STRING_H__
 #define __MVDAPI_STRING_H__
 
+/// -----------------------------------------------------------------------------
+///
+/// @file    MVDAPI_String.h
+/// @author  Mike.Guo
+/// @version 0.1
+/// @date    2020.08.06
+/// @brief   MVDAPI应用开发接口函数声明头文件(辅助获取数据类型字符信息的函数接口)
+/// @details 这些接口用户可以不调用，可自行实现自定义字符信息。
+///
+/// -----------------------------------------------------------------------------
+
+
 #if (defined (_WIN32) || defined(_WIN64))
 #    if defined(MVDAPI_EXPORTS)
 #        define MVD_API __declspec(dllexport)
@@ -41,6 +53,7 @@ extern "C" {
 	/// -----------------------------------------------------------------------------
 	MVD_API PTCHAR __stdcall GetAddressModeString(MVD_ADDRESS_MODE AddressMode);
 
+	MVD_API PTCHAR __stdcall GetImageFormatString(MVD_IMAGE_FORMAT ImageFormat);
 
 	MVD_API PTCHAR __stdcall GetGainSelectorString(MVD_GAIN_SELECTOR GainSelector);
 

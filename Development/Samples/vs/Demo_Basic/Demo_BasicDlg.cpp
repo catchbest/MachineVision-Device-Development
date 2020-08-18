@@ -14,7 +14,8 @@
 
 
 
-TCHAR     g_szTraceInfo[128] = { 0 };
+TCHAR     g_szTraceInfo[BUFFER_NUM][128] = { 0 };
+int       g_nTraceNum = 0;
 
 
 //using namespace MVDSDK;
@@ -153,13 +154,16 @@ HCURSOR CDemo_BasicDlg::OnQueryDragIcon()
 void CDemo_BasicDlg::OnClose()
 {
 	// TODO:  在此添加消息处理程序代码和/或调用默认值
+	StartGrabImageThread(false);    /// 用户如果开启了主动采集线程需要在调用Uninitial之前结束
+
 	if (m_pBitmapInfo)
 	{
 		delete [] m_pBitmapInfo;
 		m_pBitmapInfo = NULL;
 	}
 
-	Uninitial();
+
+	Uninitial();    
 
 	CDialogEx::OnClose();
 }
@@ -258,9 +262,9 @@ void CDemo_BasicDlg::InitialBmpInfo()
 }
 
 /// 显示采集的图像
-void CDemo_BasicDlg::DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE *pGrabImage)
+void CDemo_BasicDlg::DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE_INFO *pGrabImageInfo, unsigned char *pGrabImageData)
 {
-	if (pGrabImage == NULL)    return;
+	if (pGrabImageInfo == NULL)    return;
 	if (nDeviceIndex != m_nDeviceCurSel)    return;
 
 	HWND   hStaticDisplay = (HWND)::GetDlgItem(m_hWnd, IDC_STATIC_DISPLAY);
@@ -268,10 +272,10 @@ void CDemo_BasicDlg::DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE *pGrabImage)
 	int    nOldMode = -1;
 
 	/// 根据采集图像基本信息修改图像信息头
-	m_pBitmapInfo->bmiHeader.biWidth = pGrabImage->ImageBaseInfo.nImageWidth;
-	m_pBitmapInfo->bmiHeader.biHeight = pGrabImage->ImageBaseInfo.nImageHeight;
-	m_pBitmapInfo->bmiHeader.biBitCount = pGrabImage->ImageBaseInfo.nImageBitCount;
-	m_pBitmapInfo->bmiHeader.biSizeImage = pGrabImage->ImageBaseInfo.nTotalBytes;
+	m_pBitmapInfo->bmiHeader.biWidth = pGrabImageInfo->ImageBaseInfo.nImageWidth;
+	m_pBitmapInfo->bmiHeader.biHeight = pGrabImageInfo->ImageBaseInfo.nImageHeight;
+	m_pBitmapInfo->bmiHeader.biBitCount = pGrabImageInfo->ImageBaseInfo.nImageBitCount;
+	m_pBitmapInfo->bmiHeader.biSizeImage = pGrabImageInfo->ImageBaseInfo.nTotalBytes;
 
 
 	RECT   rt;
@@ -281,8 +285,8 @@ void CDemo_BasicDlg::DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE *pGrabImage)
 	/// 显示图像在Static控件上
 	::StretchDIBits(hDC,
 		rt.left, rt.top, rt.right - rt.left, rt.bottom - rt.top,
-		0, 0, pGrabImage->ImageBaseInfo.nImageWidth, pGrabImage->ImageBaseInfo.nImageHeight,
-		pGrabImage->ucImageData,
+		0, 0, pGrabImageInfo->ImageBaseInfo.nImageWidth, pGrabImageInfo->ImageBaseInfo.nImageHeight,
+		pGrabImageData,
 		(BITMAPINFO *)m_pBitmapInfo,
 		DIB_RGB_COLORS,
 		SRCCOPY);
@@ -338,16 +342,19 @@ void CDemo_BasicDlg::OnBnClickedCheckOpenCloseDevice()
 
 
 /// 采集回调
-void __stdcall GrabbingCallback(int nDeviceIndex, MVD_GRAB_IMAGE* pGrabImage, void* pUser)
+void __stdcall GrabbingCallback(int nDeviceIndex, MVD_GRAB_IMAGE_INFO* pGrabImageInfo, unsigned char *pGrabImageData, void* pUser)
 {
 	CDemo_BasicDlg *pDlg = (CDemo_BasicDlg*)pUser;
 
 	TCHAR szBuf[128] = { 0 };
-	_stprintf_s(szBuf, 128, _T("GrabbingCallback( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"), pGrabImage->ImageExtendInfo.uiFrameCounter, pGrabImage->ImageExtendInfo.ui64ElapseTimeMicrosecond, pGrabImage->ucImageData);
+	_stprintf_s(szBuf, 128, _T("GrabbingCallback( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"), 
+		pGrabImageInfo->ImageExtendInfo.uiFrameCounter, 
+		pGrabImageInfo->ImageExtendInfo.ui64ElapseTimeMicrosecond, 
+		pGrabImageData);
 	// m_ListTrace.AddString(szBuf);
 
 	/// 显示图像
-	pDlg->DisplayImage(nDeviceIndex, pGrabImage);
+	pDlg->DisplayImage(nDeviceIndex, pGrabImageInfo, pGrabImageData);
 }
 
 /// 启动、停止回调采集
@@ -409,15 +416,19 @@ void CDemo_BasicDlg::GrabImageThreadX(int nDeviceIndex)
 		}
 
 		/// 采集一帧图像，这时的图像信息及数据都在pImageOut结构中，这个是SDK分配的，要尽快调用GrabImageRelease释放。
-		MVD_GRAB_IMAGE *pGrabImage = NULL;
-		TRACE_API(GrabImage(nDeviceIndex, &pGrabImage));
+		MVD_GRAB_IMAGE_INFO *pGrabImageInfo = NULL;
+		unsigned char       *pGrabImageData = NULL;
+		TRACE_API(GrabImage(nDeviceIndex, &pGrabImageInfo, &pGrabImageData));
 
 		TCHAR szBuf[128] = { 0 };
-		_stprintf_s(szBuf, 128, _T("GrabImageThreadX( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"), pGrabImage->ImageExtendInfo.uiFrameCounter, pGrabImage->ImageExtendInfo.ui64ElapseTimeMicrosecond, pGrabImage->ucImageData);
+		_stprintf_s(szBuf, 128, _T("GrabImageThreadX( uiFrameCounter = %d, Elapse = %d, ImageData = %p )\n"),
+			pGrabImageInfo->ImageExtendInfo.uiFrameCounter, 
+			pGrabImageInfo->ImageExtendInfo.ui64ElapseTimeMicrosecond, 
+			pGrabImageData);
 		// m_ListTrace.AddString(szBuf);
 
 		/// 显示图像到Static窗口
-		DisplayImage(nDeviceIndex, pGrabImage);
+		DisplayImage(nDeviceIndex, pGrabImageInfo, pGrabImageData);
 
 #if 0
 		/// 保存图像
@@ -466,6 +477,8 @@ bool CDemo_BasicDlg::StartGrabImageThread(bool bStart)
 	}
 	else
 	{
+		if (m_hGrabImageThread[m_nDeviceCurSel] == NULL)   return true;
+
 		if (m_hGrabImageExitEvent[m_nDeviceCurSel] != NULL)
 		{
 			SetEvent(m_hGrabImageExitEvent[m_nDeviceCurSel]);

@@ -39,6 +39,8 @@ extern "C" {
 #include "MVDAPI_TypeDefine.h"
 #include "MVDAPI_String.h"
 
+	namespace MVD
+	{
 
 	/// -----------------------------------------------------------------------------
 	///
@@ -70,14 +72,16 @@ extern "C" {
     /// @brief     初始化SDK库，枚举指定接口的设备，并返回设备信息列表。
     /// @attention 此函数可连续调用，但连续调用不会改变设备的数目，需要调用Uninitial之后再次调用此函数才可重新获取所连接设备数目和信息。
 	/// @attention 用户获取到的MVD_DEVICE_INFORMATION指针数组可通过调用GetDeviceIndex来获取设备的索引（nIndex）
+	/// @attention pstDeviceInfoList指向SDK内部的内存地址，这段地址用户不可修改。
     /// @param     [IN]nDeviceInterfaceType 设定要枚举的设备接口类型，请参考MVD_DEVICE_INTERFACE_TYPE枚举类型的定义，可进行组合。
     /// @param     [OUT]pstDeviceInfoList   成功返回后，设备信息的指针会被填写进此结构中。
     /// @return    MVD_SUCCESS              表示成功。 其他返回值请参考MVDAPI_ReturnCode.h头文件。
 	/// @see       MVD_DEVICE_INTERFACE_TYPE
-	/// @note      pstDeviceInfoList指向SDK内部的内存地址，这段地址用户不可修改。
 	///
     /// -----------------------------------------------------------------------------
 	MVD_API MVD_ReturnCode __stdcall Initial(IN const unsigned int uiDeviceInterfaceType, OUT MVD_DEVICE_INFORMATION_LIST* pstDeviceInformationList);
+
+
 
     /// -----------------------------------------------------------------------------
 	///
@@ -171,11 +175,11 @@ extern "C" {
 
 	/// @brief     设置采集图像格式。
 	/// @attention 注意，这个函数不可以在启动采集后调用，必须要停止数据流后调用。
-	MVD_API MVD_ReturnCode __stdcall SetImageFormat(IN int nIndex, MVD_IMAGE_FORMAT ImageFormat);
+	MVD_API MVD_ReturnCode __stdcall SetPixelFormat(IN int nIndex, IN MVD_PIXEL_FORMAT PixelFormat);
 
 
 	/// @brief     获取采集图像格式。
-	MVD_API MVD_ReturnCode __stdcall GetImageFormat(IN int nIndex, MVD_IMAGE_FORMAT *pImageFormat);
+	MVD_API MVD_ReturnCode __stdcall GetPixelFormat(IN int nIndex, OUT MVD_PIXEL_FORMAT *pPixelFormat);
 
 	/// @brief     获取当前设置条件下，采集图像的基本信息。
 	MVD_API MVD_ReturnCode __stdcall GetImageBaseInfo(IN int nIndex, MVD_IMAGE_BASE_INFO *pImageBaseInfo);
@@ -216,7 +220,7 @@ extern "C" {
 	/// @brief     主动采集。
 	/// @attention 调用GrabImage之前，必须调用SetGrabbingStart开启视频流，这个内存由SDK分配，用户不需要分配内存。使用之后需要调用GrabImageRelease通知SDK释放资源，否则会堵塞Grabbing线程。
 	///            回调采集（SetGrabbingCallback）与主动采集（调用GrabImage进行采集）用户只能选择其一，不可同时使用。
-	MVD_API MVD_ReturnCode __stdcall GrabImage(IN const int nIndex, OUT MVD_GRAB_IMAGE **ppGrabImage);
+	MVD_API MVD_ReturnCode __stdcall GrabImage(IN const int nIndex, OUT MVD_GRAB_IMAGE_INFO **ppGrabImageInfo, OUT unsigned char **ppGrabImageData);
 
 	/// @brief     通知SDK释放主动采集资源。
 	/// @attention 每次调用一次MVD_GrabImage并对图像处理之后，必须调用一次此函数，以通知SDK释放资源，否则会堵塞Grabbing线程。
@@ -224,7 +228,7 @@ extern "C" {
 
 
 	/// @brief     保存图像。
-	MVD_API MVD_ReturnCode __stdcall SaveImage(IN const MVD_GRAB_IMAGE *pGrabImage, IN const MVD_SAVE_IMAGE_INFORMATION SaveImageInformation);
+	MVD_API MVD_ReturnCode __stdcall SaveImage(IN const MVD_GRAB_IMAGE_INFO *pGrabImageInfo, IN unsigned char *ppGrabImageData, IN const MVD_SAVE_IMAGE_INFORMATION SaveImageInformation);
 
 	/// @brief     设置图像是否垂直翻转。
 	MVD_API MVD_ReturnCode __stdcall GetFlip(IN int nIndex, bool *pbFlip);
@@ -565,6 +569,9 @@ extern "C" {
 	MVD_API MVD_ReturnCode __stdcall GetDefaultUserPresetting(IN int nIndex, OUT MVD_USER_PRESETTING *pUserPresetting);
 
 	MVD_API bool __stdcall IsUserPresettingAvailable(IN int nIndex, IN MVD_USER_PRESETTING UserPresetting);
+
+		}
+
 
 #ifdef __cplusplus
 }

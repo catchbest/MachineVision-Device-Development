@@ -18,7 +18,10 @@ struct GRAB_THREAD_CONTEXT
 };
 
 /// 由于我们需要在线程里把信息更新至控件，需要自定义消息，使用PostMessage发送，并需要使用全局的Buffer保留跟踪字符串。
-extern TCHAR     g_szTraceInfo[128];
+#define BUFFER_NUM  4
+
+extern TCHAR     g_szTraceInfo[BUFFER_NUM][128];    /// 做一个buffer队列，以防止PostMessage乱序
+extern int       g_nTraceNum;
 
 #define TRACE_API(_FUNCTION_) \
 {\
@@ -26,8 +29,9 @@ extern TCHAR     g_szTraceInfo[128];
 	TCHAR    *pszReturnCode = NULL; \
 	TCHAR    *pszFunctionName = _T(#_FUNCTION_); \
 	nReturnCode = _FUNCTION_; \
-	_stprintf_s(g_szTraceInfo, 128, _T("%s, %s"), pszFunctionName, GetReturnCodeString(nReturnCode)); \
-	PostMessage(MSG_TRACE, 0, (LPARAM)g_szTraceInfo); \
+	_stprintf_s(g_szTraceInfo[g_nTraceNum % BUFFER_NUM], 128, _T("%s, %s"), pszFunctionName, GetReturnCodeString(nReturnCode)); \
+	PostMessage(MSG_TRACE, 0, (LPARAM)g_szTraceInfo[g_nTraceNum % BUFFER_NUM]); \
+	g_nTraceNum++;\
 }
 
 
@@ -85,7 +89,7 @@ public:
 
 
 public:
-	void DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE *pFrameOut);
+	void DisplayImage(int nDeviceIndex, MVD_GRAB_IMAGE_INFO *pGrabImageInfo, unsigned char *pGrabImageData);
 private:
 	void InitialBmpInfo();
 	BITMAPINFO    *m_pBitmapInfo;

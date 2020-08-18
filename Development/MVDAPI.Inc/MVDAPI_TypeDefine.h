@@ -1,5 +1,5 @@
-#ifndef __MVDAPI_TYPE_H__
-#define __MVDAPI_TYPE_H__
+#ifndef __MVDAPI_TYPE_DEFINE_H__
+#define __MVDAPI_TYPE_DEFINE_H__
 
 /// -----------------------------------------------------------------------------
 ///
@@ -73,6 +73,7 @@ typedef struct _tag_MVD_DEVICE_INFORMATION_LIST
 	MVD_DEVICE_INFORMATION   *pDeviceInformation[MVD_MAX_DEVICE_NUM];     ///< 相应的设备信息指针，这个指针指向SDK对应的地址，不可进行内容的修改
 }MVD_DEVICE_INFORMATION_LIST, *PMVD_DEVICE_INFORMATION_LIST;
 
+/// 读取模式(抽点模式)
 enum MVD_ADDRESS_MODE
 {
 	AM_1 = 0,     ///< 正常读取
@@ -81,6 +82,7 @@ enum MVD_ADDRESS_MODE
 	AM_8 = 3,     ///< 8x8抽取1个像素
 };
 
+/// ROI(感兴趣区域)数据结构定义
 typedef struct _tag_MVD_ROI_SIZE
 {
 	unsigned int     uiColSize;         ///< 视场列像元数目
@@ -96,6 +98,7 @@ typedef struct _tag_MVD_ROI_OFFSET
 	unsigned int     uiRowStart;
 }MVD_ROI_START, *PMVD_ROI_START;
 
+/// 用户预设组定义
 enum MVD_USER_PRESETTING
 {
 	UP_0 = 0,     ///< 用户预设组0
@@ -105,6 +108,7 @@ enum MVD_USER_PRESETTING
 	UP_INVALID = -1    ///< 无效预设组
 };
 
+/// 增益选择子
 enum MVD_GAIN_SELECTOR
 {
 	GS_GLOBAL = 0,                  ///< 全局增益，对于彩色会同时调节红绿蓝增益
@@ -113,6 +117,7 @@ enum MVD_GAIN_SELECTOR
 	GS_BLUE = 3                     ///< 兰增益
 };
 
+/// 自动曝光模式
 enum MVD_EXPOSURE_MODE
 {
 	EM_MANUAL = 0,          ///< 手动调节曝光
@@ -120,6 +125,7 @@ enum MVD_EXPOSURE_MODE
 	EM_AUTO_CONTINUOUS = 2, ///< 软件处理自动连续调节曝光，设置后即启动
 };
 
+/// 自动曝光回调中提示当前自动曝光处理状态
 enum MVD_AUTO_EXPOSURE_STATUS
 {
 	AES_ONCE_SUCCESS = 0, 			///< 单次调节成功
@@ -132,6 +138,8 @@ enum MVD_AUTO_EXPOSURE_STATUS
 	AES_CONTINUOUS_FAIL_OVER_RANGE 	///< 连续调节失败，失败原因曝光超出设置范围
 };
 
+/// 白平衡模式
+/// 如果设备支持硬件白平衡，优先选择硬件白平衡(保证效率)
 enum MVD_WHITE_BALANC_MODE
 {
 	WBM_DISABLE = 0,                  ///< 使白平衡无效
@@ -145,36 +153,40 @@ enum MVD_WHITE_BALANC_MODE
 	WBM_HARDWARE_MANUAL = 8           ///< 手动设置硬件白平衡效正矩阵
 };
 
+/// 颜色效正模式枚举类型
+/// 如果设备支持硬件颜色效正，优先选择硬件效正模式(保证效率)
 enum MVD_COLOR_CORRECTION_MODE
 {
-	CCM_DISABLE = 0,
-	CCM_SOFTWARE_PRESETTING = 1,
-	CCM_SOFTWARE_MANUAL = 2,
-	CCM_HARDWARE_PRESETTING = 3,
-	CCM_HARDWARE_MANUAL = 4
+	CCM_DISABLE = 0,                  ///< 颜色效正不使能
+	CCM_SOFTWARE_PRESETTING = 1,      ///< 软件颜色效正预设值模式，参看SetColorCorrectionPresetting
+	CCM_SOFTWARE_MANUAL = 2,          ///< 手动设置软件颜色效正系数矩阵模式，参看SetColorCorrectionMatrix
+	CCM_HARDWARE_PRESETTING = 3,      ///< 硬件颜色效正预设值模式，参看SetColorCorrectionPresetting
+	CCM_HARDWARE_MANUAL = 4           ///< 手动设置硬件颜色效正系数矩阵模式，参看SetColorCorrectionMatrix
 };
 
+/// 色温定义枚举类型
 enum MVD_COLOR_TEMPERATURE
 {
 	CT_5000K = 0,                         ///< 色温5000K
 	CT_6500K = 1,                         ///< 色温6500K
-	CT_2800K = 2
+	CT_2800K = 2                          ///< 色温2800K
 };
 
-enum MVD_IMAGE_FORMAT
+/// 像素格式枚举类型(小端字节序)
+enum MVD_PIXEL_FORMAT
 {
-	IF_RAW8 = 0,
-	IF_GRAY8,
-	IF_RGB24,
-	IF_RGB32,
-	IF_BGR24,
-	IF_BGR32,
-	IF_RAW16,
-	IF_GRAY16,
-	IF_RGB48,
-	IF_RGB64,
-	IF_BGR48,
-	IF_BGR64,
+	PF_RAW8 = 0,    ///< 8bit原始
+	PF_GRAY8,       ///< 8bit灰度（对于黑白相机，等同于PF_RAW8)
+	PF_RGB24,       ///< 24bit，RGB排列，内存B在低地址
+	PF_RGB32,       ///< 32bit，RGBA排列，内存B在低地址
+	PF_BGR24,       ///< 24bit，BGR排列，内存R在低地址
+	PF_BGR32,       ///< 32bit，BGRA排列，内存R在低地址
+	PF_RAW16,       ///< 16bit原始(其中的有效位可通过GetAdcResolution函数获取)
+	PF_GRAY16,      ///< 16bit灰度（对于黑白相机，等同于PF_RAW16)
+	PF_RGB48,       ///< 48bit, RGB排列，内存B在低地址，R,G,B各占2字节，低8位在低地址
+	PF_RGB64,       ///< 64bit, RGBA排列，内存B在低地址，R,G,B各占2字节，低8位在低地址
+	PF_BGR48,       ///< 48bit, BGR排列，内存R在低地址，R,G,B各占2字节，低8位在低地址
+	PF_BGR64,       ///< 64bit, BGRA排列，内存R在低地址，R,G,B各占2字节，低8位在低地址
 
 };
 
@@ -248,13 +260,13 @@ struct MVD_IMAGE_EXTEND_INFO
 	int                      nReserved1[32];
 };
 
-/// 
+/// 采集图像的信息及数据，是一段连续的内存地址空间，ucImageData数组的大小等于ImageBaseInfo的nTotalBytes值。
 typedef struct
 {
-	MVD_IMAGE_BASE_INFO     ImageBaseInfo;     ///< 采集图像的基本信息
-	MVD_IMAGE_EXTEND_INFO   ImageExtendInfo;   ///< 采集图像的扩展信息
-	unsigned char           ucImageData[1];    ///< 为图像数据的第一个数据地址
-}MVD_GRAB_IMAGE;
+	MVD_IMAGE_BASE_INFO     ImageBaseInfo;     ///< 采集图像的基本信息。
+	MVD_IMAGE_EXTEND_INFO   ImageExtendInfo;   ///< 采集图像的扩展信息。
+	// unsigned char           ucImageData[1];    ///< 为图像的第一个数据，是一段由库内动态分配的，与ImageExtendInfo连续的一段内存地址，内存大小等于ImageBaseInfo的nTotalBytes值。
+}MVD_GRAB_IMAGE_INFO;
 
 #pragma pack(pop)
 
@@ -285,7 +297,7 @@ typedef void(__stdcall *PMVD_WHITE_BALANCE_CALLBACK)(OUT int nDeviceIndex, OUT f
 /// 自动曝光回调函数指针定义
 typedef void(__stdcall *PMVD_AUTO_EXPOSURE_CALLBACK)(OUT int nDeviceIndex, OUT MVD_AUTO_EXPOSURE_STATUS Status, OUT float fExpsoureTimeUs, OUT void *lpContext);
 /// 采集图像回调函数指针定义
-typedef void(__stdcall *PMVD_GRABBING_CALLBACK)(OUT int nDeviceIndex, OUT OUT MVD_GRAB_IMAGE* pGrabImage, OUT void* lpContext);
+typedef void(__stdcall *PMVD_GRABBING_CALLBACK)(OUT int nDeviceIndex, OUT MVD_GRAB_IMAGE_INFO* pGrabImageInfo, OUT unsigned char *pGrabImageData,  OUT void* lpContext);
 
 
 #endif

@@ -23,6 +23,8 @@
 #define MVD_E_NULL_POINTER   0x80000020L    ///< 空指针
 #define MVD_E_MALLOC         0x80000040L    ///< 分配内存失败
 #define MVD_E_CONFLICT       0x80000080L    ///< 设置有冲突
+#define MVD_E_SYSTEM         0x80000100L    ///< 系统函数调用错误
+#define MVD_E_UNKNOWN        0x80000200L    ///< 未知错误（本不应该发生的）
 
 
 

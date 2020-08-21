@@ -48,20 +48,54 @@ union MVD_VERSION
 	unsigned short usVersion;
 };
 
+enum MVD_GIGE_DRIVER_TYPE
+{
+	GDT_SOCKET = 0,
+	GDT_FILTER = 1
+};
 ///-----------------------------------------------------------------------------
 ///  设备信息结构体，兼容不同的设备接口类型的设备
 ///-----------------------------------------------------------------------------
 struct MVD_DEVICE_INFORMATION
 {
-	unsigned int    uiDeviceModel;       ///< 设备型号
-	TCHAR           szModelName[64];     ///< 型号名称
-	unsigned int    uiSerialNumber;      ///< 设备序列号
-	MVD_VERSION     FirmwareVersion;     ///< 固件版本号
-	MVD_VERSION     FpgaVersion;         ///< FPGA版本号
-	MVD_VERSION     HardwareVersion;     ///< 硬件版本
+	unsigned int    uiDeviceModel;            ///< 设备型号
+	TCHAR           szModelName[64];          ///< 型号名称
+	unsigned int    uiSerialNumber;           ///< 设备序列号
+	MVD_VERSION     FirmwareVersion;          ///< 固件版本号
+	MVD_VERSION     FpgaVersion;              ///< FPGA版本号
+	MVD_VERSION     HardwareVersion;          ///< 硬件版本
+
+	TCHAR           szUserDefinedName[32];    ///< 用户自定义名称++0.4
+	int             nReserved0[32];           ///< Common Information
 
 	MVD_DEVICE_INTERFACE_TYPE    DeviceInterfaceType;    ///< 设备的接口类型
-	int                          nReserved0[64];      ///< 保留信息，USB与GIGE区别信息
+
+	union
+	{
+		struct
+		{
+			MVD_GIGE_DRIVER_TYPE    DriverType;
+
+			TCHAR         szAdapterFriendlyName[128];
+			unsigned char ucAdapterMac[8];
+			unsigned char ucAdapterIp[8];
+			unsigned char ucAdapterSubnetMask[8];
+			unsigned char ucAdapterDefaultGateWay[8];
+
+			
+			unsigned char ucDeviceMac[8];
+			unsigned char ucDeviceIp[8];
+			unsigned char ucDeviceSubnetMask[8];
+			unsigned char ucDeviceDefaultGateWay[8];
+		}GigE;
+
+		struct
+		{
+
+		}Usb;
+
+		int                          nReserved0[64];         ///< 保留信息，USB与GIGE区别信息
+	}SpecialInfo;
 };
 
 //-----------------------------------------------------------------------------
@@ -256,6 +290,9 @@ struct MVD_IMAGE_EXTEND_INFO
 
 	unsigned int             uiTriggerCounter;            ///< 输入外触发信号计数，是否需要区分外触发、软件触发计数，是否区分上升沿，电平？
 	unsigned int             uiFrameCounter;              ///< 传输帧计数
+	unsigned int             uiFrameId;                   ///< 帧ID
+	unsigned int             uiLostPacket;                ///< 丢包数量
+	unsigned int             uiImageBytesRead;            ///< 实际读取的字节数
 
 	int                      nReserved1[32];
 };

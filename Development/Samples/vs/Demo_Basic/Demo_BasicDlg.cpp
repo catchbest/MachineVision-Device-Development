@@ -632,71 +632,75 @@ void CDemo_BasicDlg::Update_ListBoxDeviceInfo()
 		_stprintf_s(szDeviceInfo, 128, _T("%s:  GIGE"), g_Language == L_CHS ? _T("设备接口类型") : _T("DeviceInterfaceType"));
 		pListBox->AddString(szDeviceInfo);
 
-		_stprintf_s(szDeviceInfo, 128, _T("%s: %s"), g_Language == L_CHS ? _T("网卡名称") : _T("AdapterName"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.szAdapterFriendlyName);
+		_stprintf_s(szDeviceInfo, 128, _T("%s: %s"), g_Language == L_CHS ? _T("网卡名称") : _T("AdapterName"), m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.szAdapterFriendlyName);
 		pListBox->AddString(szDeviceInfo);
 
 	    _stprintf_s(szDeviceInfo, 128, _T("%s: %x-%x-%x-%x-%x-%x"), 
 			g_Language == L_CHS ? _T("网卡物理地址") : _T("AdapterMac"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[1], 
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[2], 
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[3], 
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[4], 
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterMac[5]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[3],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[4],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterMac[5]);
 	    pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("%s: %d.%d.%d.%d"),
 			g_Language == L_CHS ? _T("网卡IP地址") : _T("AdapterIp"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterIp[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterIp[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterIp[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterIp[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterIp[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterIp[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterIp[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterIp[3]);
 		pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("AdapterSubnetMask = %d.%d.%d.%d"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterSubnetMask[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterSubnetMask[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterSubnetMask[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterSubnetMask[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterSubnetMask[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterSubnetMask[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterSubnetMask[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterSubnetMask[3]);
 		pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("AdapterDefaultGateWay = %d.%d.%d.%d"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterDefaultGateWay[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterDefaultGateWay[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterDefaultGateWay[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucAdapterDefaultGateWay[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterDefaultGateWay[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterDefaultGateWay[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterDefaultGateWay[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucAdapterDefaultGateWay[3]);
 		pListBox->AddString(szDeviceInfo);
+
+		_stprintf_s(szDeviceInfo, 128, _T("AdapterMtu = %d"),
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.uiMtu);
+			pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("%s: %x-%x-%x-%x-%x-%x"),
 			g_Language == L_CHS ? _T("设备物理地址") : _T("DeviceMac"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[3],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[4],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceMac[5]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[3],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[4],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceMac[5]);
 		pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("%s: %d.%d.%d.%d"),
 			g_Language == L_CHS ? _T("设备IP地址") : _T("DeviceIp"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceIp[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceIp[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceIp[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceIp[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceIp[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceIp[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceIp[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceIp[3]);
 		pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("DeviceSubnetMask = %d.%d.%d.%d"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceSubnetMask[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceSubnetMask[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceSubnetMask[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceSubnetMask[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceSubnetMask[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceSubnetMask[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceSubnetMask[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceSubnetMask[3]);
 		pListBox->AddString(szDeviceInfo);
 
 		_stprintf_s(szDeviceInfo, 128, _T("DeviceDefaultGateWay = %d.%d.%d.%d"),
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceDefaultGateWay[0],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceDefaultGateWay[1],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceDefaultGateWay[2],
-			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.GigE.ucDeviceDefaultGateWay[3]);
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceDefaultGateWay[0],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceDefaultGateWay[1],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceDefaultGateWay[2],
+			m_DeviceInformationList.pDeviceInformation[m_nDeviceCurSel]->SpecialInfo.stGigEInfo.ucDeviceDefaultGateWay[3]);
 		pListBox->AddString(szDeviceInfo);
 
 	}
